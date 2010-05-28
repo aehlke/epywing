@@ -104,16 +104,23 @@ class EpwingBook(object):
 
 
     @property
+    def _search_methods(self):
+        '''Returns the search methods this dictionary supports, plus the corresponding EB method.
+        [('name', meth,),]
+        '''
+        all_methods = {'exact': (eb_have_exactword_search, eb_search_exactword,),
+                       'prefix': (eb_have_word_search, eb_search_word,),
+                       'suffix': (eb_have_endword_search, eb_search_endword,),
+                       'keyword': (eb_have_keyword_search, eb_search_keyword,),
+                       #'multi': (eb_have_multi_search, eb_search_multi,),
+        }
+        return dict((key, val[1],) for key, val in all_methods.items() if val[0](self.book))
+
+    @property
     def search_methods(self):
         '''Returns a list of the search methods that this dictionary file supports.
         '''
-        all_methods = {'exact': eb_have_exactword_search,
-                       'prefix': eb_have_word_search,
-                       'suffix': eb_have_endword_search,
-                       'keyword': eb_have_keyword_search,
-                       'multi': eb_have_multi_search
-        }
-        return [key for key, val in all_methods.items() if val(self.book)]
+        return self._search_methods.keys()
 
 
     #TODO separate URI from ID - have both!?
@@ -184,14 +191,7 @@ class EpwingBook(object):
             eb_set_subbook(self.book, int(subbook_id))
 
         query_encoded = query.encode('euc-jp')
-        if not (search_method in self.search_methods):
-            return
-        if search_method == 'exact':
-            eb_search_exactword(self.book, query_encoded)
-        elif search_method == 'prefix':
-            eb_search_word(self.book, query_encoded)
-        elif search_method == 'suffix':
-            eb_search_endword(self.book, query_encoded)
+        self._search_methods[search_method](self.book, query_encoded)
 
         while True:
             hits = eb_hit_list(self.book)
