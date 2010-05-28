@@ -73,7 +73,7 @@ class EpwingBook(object):
         except EBError, (error, message):
             code = eb_error_string(error)
             #FIXME raise an exception instead
-            sys.stderr.write("Error: %s: %s\n" % (code, message))
+            sys.stderr.write('Error: %s: %s\n' % (code, message))
             sys.exit(1)
 
     def __enter__(self):
@@ -235,10 +235,10 @@ class EpwingBook(object):
         #TODO refactor
         data = unicode(data, 'euc-jp', errors='ignore')
         data = string.replace(data, u'\x00', '') #remove null characters, which can break lxml's HTML parser
-        data = string.replace(data, u"→§", u"§") #""
-        data = string.replace(data, u"＝→", u"＝")
-        data = string.replace(data, u"⇒→", u"⇒")
-        data = string.replace(data, u"⇔→", u"⇔")
+        data = string.replace(data, u'→§', u'§') #''
+        data = string.replace(data, u'＝→', u'＝')
+        data = string.replace(data, u'⇒→', u'⇒')
+        data = string.replace(data, u'⇔→', u'⇔')
         data = self._fix_html_hacks(data)
         return data
 
@@ -360,13 +360,6 @@ class EpwingBook(object):
     #TODO refactor hook code into its own module
     #TODO use eb_narrow_font_character_bitmap for unknown ones, using a img tag whose url has the gaiji id
     def _hook_font(self, book, appendix, container, code, argv):
-        narrow_gaiji = {
-                0xa120: '',
-                0xa121: '* ',
-        }
-        wide_gaiji = {
-                0xa34e: "-",
-        }
         gaiji = {
                 EB_HOOK_NARROW_FONT: {
                     0xa120: '',
@@ -448,7 +441,7 @@ def main():
         #/home/alex/dictionaries/chujiten/')
 
         for h, c, s, e, u in my_dict.search('horse'):
-            print(u"{0}:\n{1}".format(h, c))
+            print(u'{0}:\n{1}'.format(h, c))
 
 
 
