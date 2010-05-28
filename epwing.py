@@ -30,23 +30,25 @@ EPWING_BOOKS_PATH = ''#'/home/alex/dictionaries/'
 books_directory = EPWING_BOOKS_PATH
 
 
+from functools import wraps
 
-class uses_eb_library(object):
-    '''decorator for methods which call the EB library, since it needs to be initialized and finalized before and after.
-    '''
-    def __init__(self, f):
-        self.f = f
-        self.in_progress = False
 
-    def __call__(self):
-        was_in_progress = self.in_progress
-        if not was_in_progress:
-            self.in_progress = True
-            eb_initialize_library()
-        self.f()
-        if not was_in_progress:
-            eb_finalize_library()
-            self.in_progress = False
+#class EBInitializer(object):
+#    initialized = False
+
+#    @classmethod
+#    def uses_eb_library(cls, f):
+#        def wrapper(self, *args, **kwargs):
+#            import pdb;pdb.set_trace()
+#            was_initialized = cls.initialized
+#            if not was_initialized:
+#                cls.initialized = True
+#                eb_initialize_library()
+#            ret = f(self, *args, **kwargs)
+#            if not was_initialized:
+#                cls.initialized = False
+#                eb_finalize_library()
+#        return wrapper
 
 
 class EpwingBook(object):
@@ -56,7 +58,6 @@ class EpwingBook(object):
                      'audio': 'subbook/{subbook_id}/audio/{audio_id}'
     }
 
-    @uses_eb_library
     def __init__(self, book_path):#book_id):#, URI_prefix=''): #books_directory=self.books_directory
         #self.book_id = book_id
         #if not self._book_cache.has_key(book_id):
@@ -75,7 +76,13 @@ class EpwingBook(object):
             sys.stderr.write("Error: %s: %s\n" % (code, message))
             sys.exit(1)
 
-    @uses_eb_library
+    def __enter__(self):
+        eb_initialize_library()
+        return self
+    
+    def __exit__(self, type, value, traceback):
+        eb_finalize_library()
+
     def _set_hooks(self):
         eb_set_hooks(self.hookset, (
             (EB_HOOK_NEWLINE,             self._hook_new_line),
@@ -97,7 +104,6 @@ class EpwingBook(object):
 
 
     @property
-    @uses_eb_library
     def search_methods(self):
         '''Returns a list of the search methods that this dictionary file supports.
         '''
@@ -113,7 +119,6 @@ class EpwingBook(object):
     #TODO separate URI from ID - have both!?
 
     @property
-    @uses_eb_library
     def subbooks(self):
     #TODO def subbooks(cls, book, URI_prefix=''):
         '''Returns a list of the subbooks, with their name, URI and directory, for the current book
@@ -127,7 +132,6 @@ class EpwingBook(object):
         return ret
 
 
-    @uses_eb_library
     def entry(self, entry_id, subbook_id, container=None):
         entry_locations = map(_num_decode, entry_id.split(_ENTRY_ID_SPLIT))
         if len(entry_locations) == 4:
@@ -149,7 +153,6 @@ class EpwingBook(object):
 
 
     #TODO test this
-    @uses_eb_library
     def audio(self, audio_id, subbook_id):
         eb_set_subbook(self.book, int(subbook_id))
         page, offset, data_size = map(_num_decode, audio_id.split(_ENTRY_ID_SPLIT))
@@ -169,7 +172,6 @@ class EpwingBook(object):
             wave_data = wave_data[:12] + wave_data[44:]
         return wave_data
 
-    @uses_eb_library
     def search(self, query, subbook_id=None, search_method='exact', search_options=None, container=None):
         #TODO what's container?
         if not subbook_id:
@@ -182,7 +184,7 @@ class EpwingBook(object):
             eb_set_subbook(self.book, int(subbook_id))
 
         query_encoded = query.encode('euc-jp')
-        if not (search_method in self.search_methods()):
+        if not (search_method in self.search_methods):
             return
         if search_method == 'exact':
             eb_search_exactword(self.book, query_encoded)
@@ -204,7 +206,6 @@ class EpwingBook(object):
                     yield (heading, content, subbook_id, entry_id, uri, )
 
     #TODO separate the heading method
-    @uses_eb_library
     def _get_content(self, subbook, position, container, content_method, packed=False, entry_count=1):
         eb_set_subbook(self.book, int(subbook))
 
@@ -233,6 +234,7 @@ class EpwingBook(object):
 
         #TODO refactor
         data = unicode(data, 'euc-jp', errors='ignore')
+        data = string.replace(data, u'\x00', '') #remove null characters, which can break lxml's HTML parser
         data = string.replace(data, u"→§", u"§") #""
         data = string.replace(data, u"＝→", u"＝")
         data = string.replace(data, u"⇒→", u"⇒")
@@ -284,7 +286,7 @@ class EpwingBook(object):
     def _write_text_anchor(self, book, position):
         subbook_id = str(eb_subbook(self.book))
         entry_id = _position_to_resource_id(position)
-        uri = self.uri_templates['entry'].format(book_id=self.book_id, subbook_id=subbook_id, entry_id=entry_id)
+        uri = self.uri_templates['entry'].format(subbook_id=subbook_id, entry_id=entry_id)
         eb_write_text_string(book, '<a name=\"{0}\" />'.format(uri))
 
     #hooks
@@ -352,88 +354,101 @@ class EpwingBook(object):
             page = int(argv[2])
             offset = int(argv[3])
             audio_id = _position_to_resource_id([page, offset, data_size])
-            uri = self.uri_base + self.uri_templates['audio'].format(book_id=self.book_id, subbook_id=subbook_id, audio_id=audio_id)
+            uri = self.uri_base + self.uri_templates['audio'].format(subbook_id=subbook_id, audio_id=audio_id)
             eb_write_text_string(self.book, '</a><hack_attribs href=\"{0}\" />'.format(uri))
 
     #TODO refactor hook code into its own module
     #TODO use eb_narrow_font_character_bitmap for unknown ones, using a img tag whose url has the gaiji id
     def _hook_font(self, book, appendix, container, code, argv):
-        gaiji = {
-          (EB_HOOK_NARROW_FONT, 0xa120): "",
-          (EB_HOOK_NARROW_FONT, 0xa121): "* ",
-          (EB_HOOK_NARROW_FONT, 0xa122): "** ",
-          (EB_HOOK_NARROW_FONT, 0xa123): "*** ",
-          (EB_HOOK_NARROW_FONT, 0xa124): "o ",
-          (EB_HOOK_NARROW_FONT, 0xa126): "《",
-          (EB_HOOK_NARROW_FONT, 0xa127): "》",
-          (EB_HOOK_NARROW_FONT, 0xa128): "〔",
-          (EB_HOOK_NARROW_FONT, 0xa129): "〕",
-          (EB_HOOK_NARROW_FONT, 0xa12a): "〜",
-          (EB_HOOK_NARROW_FONT, 0xa167): "a",
-          (EB_HOOK_NARROW_FONT, 0xa168): "e",
-          (EB_HOOK_NARROW_FONT, 0xa169): "i",
-          (EB_HOOK_NARROW_FONT, 0xa16a): "o",
-          (EB_HOOK_NARROW_FONT, 0xa16b): "u",
-          (EB_HOOK_NARROW_FONT, 0xa16c): "y",
-          (EB_HOOK_NARROW_FONT, 0xa16f): "I",
-          (EB_HOOK_NARROW_FONT, 0xa17b): "a",
-          (EB_HOOK_NARROW_FONT, 0xa17c): "e",
-          (EB_HOOK_NARROW_FONT, 0xa17d): "i",
-          (EB_HOOK_NARROW_FONT, 0xa17e): "o",
-          (EB_HOOK_NARROW_FONT, 0xa221): "u",
-          (EB_HOOK_NARROW_FONT, 0xa233): ":",
-          (EB_HOOK_WIDE_FONT, 0xa34e): "━",
-          (EB_HOOK_WIDE_FONT, 0xa321): "[名]",
-          (EB_HOOK_WIDE_FONT, 0xa322): "[代]",
-          (EB_HOOK_WIDE_FONT, 0xa323): "[形]",
-          (EB_HOOK_WIDE_FONT, 0xa324): "[動]",
-          (EB_HOOK_WIDE_FONT, 0xa325): "[副]",
-          (EB_HOOK_WIDE_FONT, 0xa327): "[前]",
-          (EB_HOOK_WIDE_FONT, 0xa32f): "[U]",
-          (EB_HOOK_WIDE_FONT, 0xa330): "[C]",
-          (EB_HOOK_WIDE_FONT, 0xa332): "(複)",
-          (EB_HOOK_WIDE_FONT, 0xa333): "[A]",
-          (EB_HOOK_WIDE_FONT, 0xa334): "[P]",
-          (EB_HOOK_WIDE_FONT, 0xa335): "(自)",
-          (EB_HOOK_WIDE_FONT, 0xa336): "(他)",
-          (EB_HOOK_WIDE_FONT, 0xa337): "[成",
-          (EB_HOOK_WIDE_FONT, 0xa338): "句]",
-          (EB_HOOK_WIDE_FONT, 0xa32c): "[接",
-          (EB_HOOK_WIDE_FONT, 0xa32d): "頭]",
-          (EB_HOOK_WIDE_FONT, 0xa32e): "尾]",
-          (EB_HOOK_WIDE_FONT, 0xa339): "§",
-          (EB_HOOK_WIDE_FONT, 0xa33a): "§",
-          (EB_HOOK_WIDE_FONT, 0xa33c): "§",
-          (EB_HOOK_WIDE_FONT, 0xa34f): "⇔",
-
-          #remove accents
-          (EB_HOOK_NARROW_FONT, 0xa155): 'a',
-          (EB_HOOK_NARROW_FONT, 0xa12e): 'e',
-          (EB_HOOK_NARROW_FONT, 0xa158): 'e',
-          (EB_HOOK_NARROW_FONT, 0xa15a): 'i',
-          (EB_HOOK_NARROW_FONT, 0xa159): 'i',
-          (EB_HOOK_NARROW_FONT, 0xa15b): 'o',
-          (EB_HOOK_NARROW_FONT, 0xa15c): 'o',
-          (EB_HOOK_NARROW_FONT, 0xa15d): 'u',
-
-          #symbols
-          (EB_HOOK_WIDE_FONT, 0xa43a): "&mdash;",
-          (EB_HOOK_WIDE_FONT, 0xa430): '<span style="border-width:1px; border-style:solid; padding:0px 2px 0px 2px">C</span>',
-          (EB_HOOK_WIDE_FONT, 0xa431): '<span style="border-width:1px; border-style:solid; padding:0px 2px 0px 2px">U</span>',
-
-          #characters with accents that shouldn't have accents (???)
-          (EB_HOOK_WIDE_FONT, 0xa438): "~",
+        narrow_gaiji = {
+                0xa120: '',
+                0xa121: '* ',
         }
-        eb_write_text_string(book, gaiji.get((code, argv[0]), '<span title=\"{0:x}\">?</span>'.format(argv[0])))
+        wide_gaiji = {
+                0xa34e: "-",
+        }
+        gaiji = {
+                EB_HOOK_NARROW_FONT: {
+                    0xa120: '',
+                    0xa121: '* ',
+                    0xa122: '** ',
+                    0xa123: '*** ',
+                    0xa124: 'o ',
+                    0xa126: '《',
+                    0xa127: '》',
+                    0xa128: '〔',
+                    0xa129: '〕',
+                    0xa12a: '〜',
+                    0xa167: 'a',
+                    0xa168: 'e',
+                    0xa169: 'i',
+                    0xa16a: 'o',
+                    0xa16b: 'u',
+                    0xa16c: 'y',
+                    0xa16f: 'I',
+                    0xa17b: 'a',
+                    0xa17c: 'e',
+                    0xa17d: 'i',
+                    0xa17e: 'o',
+                    0xa221: 'u',
+                    0xa233: ':',
+
+                    #remove accents
+                    0xa155: 'a',
+                    0xa12e: 'e',
+                    0xa158: 'e',
+                    0xa15a: 'i',
+                    0xa159: 'i',
+                    0xa15b: 'o',
+                    0xa15c: 'o',
+                    0xa15d: 'u',
+                },
+                EB_HOOK_WIDE_FONT: {
+                    0xa34e: '━',
+                    0xa321: '[名]',
+                    0xa322: '[代]',
+                    0xa323: '[形]',
+                    0xa324: '[動]',
+                    0xa325: '[副]',
+                    0xa327: '[前]',
+                    0xa32f: '[U]',
+                    0xa330: '[C]',
+                    0xa332: '(複)',
+                    0xa333: '[A]',
+                    0xa334: '[P]',
+                    0xa335: '(自)',
+                    0xa336: '(他)',
+                    0xa337: '[成',
+                    0xa338: '句]',
+                    0xa32c: '[接',
+                    0xa32d: '頭]',
+                    0xa32e: '尾]',
+                    0xa339: '§',
+                    0xa33a: '§',
+                    0xa33c: '§',
+                    0xa34f: '⇔',
+
+                    #symbols
+                    0xa43a: '&mdash;',
+                    0xa430: '<span style="border-width:1px; border-style:solid; padding:0px 2px 0px 2px">C</span>',
+                    0xa431: '<span style="border-width:1px; border-style:solid; padding:0px 2px 0px 2px">U</span>',
+
+                    #characters with accents that shouldn't have accents (???)
+                    0xa438: '~',
+                },
+        }
+        eb_write_text_string(book, gaiji[code].get(argv[0], '<span title=\"{0:x}\">?</span>'.format(argv[0])))
         return EB_SUCCESS
 
 
 def main():
 
-    my_dict = EpwingDictionary('./GENIUS/')#/home/alex/dictionaries/chujiten/')
+    dict_path = './taishukan/'
+    with EpwingBook(dict_path) as my_dict:
+        #/home/alex/dictionaries/chujiten/')
 
-    for h, c, k in my_dict.search('horse'):
-        print(u"{0}:\n{1}".format(h, c))
+        for h, c, s, e, u in my_dict.search('horse'):
+            print(u"{0}:\n{1}".format(h, c))
 
 
 

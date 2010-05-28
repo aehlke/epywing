@@ -1,4 +1,5 @@
 
+import string
 from base64 import urlsafe_b64encode as urlsafe_b64encode2, urlsafe_b64decode as urlsafe_b64decode2
 
 #resource id encoding
