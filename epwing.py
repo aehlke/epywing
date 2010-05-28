@@ -16,8 +16,6 @@ from lxml.cssselect import CSSSelector
 from base64 import urlsafe_b64_encode, urlsafe_b64_decode, _num_decode, _position_to_resource_id
 
 
-#methods which use the epwing library must call these before and after
-#TODO make into a decorator
 
 
 #generic dictionary interface
@@ -118,7 +116,8 @@ class EpwingBook(object):
     @uses_eb_library
     def subbooks(self):
     #TODO def subbooks(cls, book, URI_prefix=''):
-        '''Returns a list of the subbooks, with their name, URI and directory, for the current book'''
+        '''Returns a list of the subbooks, with their name, URI and directory, for the current book
+        '''
         ret = []
         for subbook in eb_subbook_list(self.book):
             ret.append({ 'name': eb_subbook_title2(self.book, subbook).decode('euc-jp'),
