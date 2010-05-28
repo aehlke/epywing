@@ -13,7 +13,7 @@ from itertools import izip, cycle
 from lxml import html
 from lxml.cssselect import CSSSelector
 
-from base64 import urlsafe_b64_encode, urlsafe_b64_decode, _num_decode, _position_to_resource_id
+from mybase64 import urlsafe_b64_encode, urlsafe_b64_decode, _num_decode, _position_to_resource_id
 
 
 
@@ -50,14 +50,14 @@ class uses_eb_library(object):
 
 
 class EpwingBook(object):
-    uri_base = '/' #e.g. /dict/
+    uri_base = '/' #e.g. /dict/ - this should actually have the book_id in it too
     uri_templates = {'entry': 'subbook/{subbook_id}/entry/{entry_id}',
                      'subbook': 'subbook/{subbook_id}',
                      'audio': 'subbook/{subbook_id}/audio/{audio_id}'
     }
 
     @uses_eb_library
-    def __init__(self, book_path)#book_id):#, URI_prefix=''): #books_directory=self.books_directory
+    def __init__(self, book_path):#book_id):#, URI_prefix=''): #books_directory=self.books_directory
         #self.book_id = book_id
         #if not self._book_cache.has_key(book_id):
             #self._refresh_book_cache()
@@ -231,7 +231,7 @@ class EpwingBook(object):
             #context->text_end_flag = 1 in 3.1
             position = eb_tell_text(self.book)
 
-
+        #TODO refactor
         data = unicode(data, 'euc-jp', errors='ignore')
         data = string.replace(data, u"→§", u"§") #""
         data = string.replace(data, u"＝→", u"＝")
@@ -305,31 +305,32 @@ class EpwingBook(object):
 
     #TODO set_indent hook
     def _hook_tags(self, book, appendix, container, code, argv):
-        if code == EB_HOOK_BEGIN_REFERENCE:
-            eb_write_text_string(book, '<a>')
-        elif code == EB_HOOK_END_REFERENCE:
+        def end_reference():
             subbook_id = str(eb_subbook(self.book))
             entry_id = _position_to_resource_id([argv[1], argv[2]])
-            uri = self.uri_base + self.uri_templates['entry'].format(book_id=self.book_id, subbook_id=subbook_id, entry_id=entry_id)
-            eb_write_text_string(book, '</a><hack_attribs href=\"{0}\" rel=\"subsection\"/>'.format(uri))
+            uri = self.uri_base + self.uri_templates['entry'].format(subbook_id=subbook_id, entry_id=entry_id)
+            return '</a><hack_attribs href=\"{0}\" rel=\"subsection\"/>'.format(uri)
             #TODO sometimes the rel will be an entry/keyword (chapter?), or book, etc.
-        elif code == EB_HOOK_BEGIN_KEYWORD:
+
+        def begin_keyword():
             self._write_text_anchor(book, eb_tell_text(book))
-            eb_write_text_string(book, '<span class="keyword">')
-        elif code == EB_HOOK_END_KEYWORD:
-            eb_write_text_string(book, '</span>')
-        elif code == EB_HOOK_BEGIN_SUBSCRIPT:
-            eb_write_text_string(book, '<sub>')
-        elif code == EB_HOOK_END_SUBSCRIPT:
-            eb_write_text_string(book, '</sub>')
-        elif code == EB_HOOK_BEGIN_SUPERSCRIPT:
-            eb_write_text_string(book, '<sup>')
-        elif code == EB_HOOK_END_SUPERSCRIPT:
-            eb_write_text_string(book, '</sup>')
-        elif code == EB_HOOK_BEGIN_EMPHASIS:
-            eb_write_text_string(book, '<em>')
-        elif code == EB_HOOK_END_EMPHASIS:
-            eb_write_text_string(book, '</em>')
+            return '<span class="keyword">'
+
+        hooks = { EB_HOOK_BEGIN_REFERENCE:    '<a>',
+                  EB_HOOK_END_REFERENCE:      end_reference,
+                  EB_HOOK_BEGIN_KEYWORD:      begin_keyword,
+                  EB_HOOK_END_KEYWORD:        '</span>',
+                  EB_HOOK_BEGIN_SUBSCRIPT:    '<sub>',
+                  EB_HOOK_END_SUBSCRIPT:      '</sub>',
+                  EB_HOOK_BEGIN_SUPERSCRIPT:  '<sup>',
+                  EB_HOOK_END_SUPERSCRIPT:    '</sup>',
+                  EB_HOOK_BEGIN_EMPHASIS:     '<em>',
+                  EB_HOOK_END_EMPHASIS:       '</em>', }
+
+        text = hooks[code]
+        if callable(text):
+            text = text()
+        eb_write_text_string(book, text)
         return EB_SUCCESS
 
     def _handle_stop_code(self, book, appendix, container, code, argv):
@@ -428,14 +429,12 @@ class EpwingBook(object):
 
 
 def main():
-    eb_initialize_library()
 
-    my_dict = EpwingDictionary('/home/alex/dictionaries/chujiten/')
+    my_dict = EpwingDictionary('./GENIUS/')#/home/alex/dictionaries/chujiten/')
 
     for h, c, k in my_dict.search('horse'):
         print(u"{0}:\n{1}".format(h, c))
 
-    eb_finalize_library()
 
 
 if __name__ == "__main__":
