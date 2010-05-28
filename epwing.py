@@ -17,11 +17,6 @@ from mybase64 import urlsafe_b64_encode, urlsafe_b64_decode, _num_decode, _posit
 
 
 
-#constants #TODO move into config file
-EPWING_BOOKS_PATH = ''#'/home/alex/dictionaries/'
-books_directory = EPWING_BOOKS_PATH
-
-
 
 class EpwingBook(object):
     uri_base = '/' #e.g. /dict/ - this should actually have the book_id in it too
@@ -30,11 +25,8 @@ class EpwingBook(object):
                      'audio': 'subbook/{subbook_id}/audio/{audio_id}'
     }
 
-    def __init__(self, book_path):#book_id):#, URI_prefix=''): #books_directory=self.books_directory
-        #self.book_id = book_id
-        #if not self._book_cache.has_key(book_id):
-            #self._refresh_book_cache()
-        self.book_path = book_path #self.books_directory + self._book_cache[book_id]['path']
+    def __init__(self, book_path):
+        self.book_path = book_path
         #TODO verify path is valid
         self.name = unicode(path.basename(self.book_path).decode('euc-jp'))#.title())
         self.book, self.appendix, self.hookset = EB_Book(), EB_Appendix(), EB_Hookset()
@@ -186,7 +178,7 @@ class EpwingBook(object):
 
         buffer = []
         data = ''
-        for i in range(200):
+        for i in xrange(200):
             eb_seek_text(self.book, position)
             while True:
                 data_chunk = content_method(self.book, self.appendix, self.hookset, container)
