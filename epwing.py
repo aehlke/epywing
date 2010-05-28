@@ -6,9 +6,8 @@
 
 from eb import *
 import sys
-import string
-from glob import glob
 from os import path
+import string
 from itertools import izip, cycle
 from lxml import html
 from lxml.cssselect import CSSSelector
@@ -175,7 +174,6 @@ class EpwingBook(object):
 
         self._buffer_entry_count = 0
         self._buffer_start_position = position
-
         buffer = []
         data = ''
         for i in xrange(200):

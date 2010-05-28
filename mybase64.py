@@ -32,5 +32,5 @@ def urlsafe_b64_encode(s):
     return urlsafe_b64encode2(s).strip('=')
 
 def urlsafe_b64_decode(s):
-    return urlsafe_b64decode2(s + '=' * (lambda x: x % 4 and (4 - x % 4) or 0)(len(s)))#s + '=' * (4 - len(s) % 4))
+    return urlsafe_b64decode2(s + '=' * (lambda x: ((5 - x) - 1) % 4)(len(s)))
 
