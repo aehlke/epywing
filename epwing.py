@@ -17,38 +17,10 @@ from mybase64 import urlsafe_b64_encode, urlsafe_b64_decode, _num_decode, _posit
 
 
 
-
-#generic dictionary interface
-#class BaseDictionary(object):
-#  SEARCH_METHODS = ['exact', 'prefix', 'suffix', 'substring']
-#  SEARCH_OPTIONS = ['icase']
-
-
-
 #constants #TODO move into config file
 EPWING_BOOKS_PATH = ''#'/home/alex/dictionaries/'
 books_directory = EPWING_BOOKS_PATH
 
-
-from functools import wraps
-
-
-#class EBInitializer(object):
-#    initialized = False
-
-#    @classmethod
-#    def uses_eb_library(cls, f):
-#        def wrapper(self, *args, **kwargs):
-#            import pdb;pdb.set_trace()
-#            was_initialized = cls.initialized
-#            if not was_initialized:
-#                cls.initialized = True
-#                eb_initialize_library()
-#            ret = f(self, *args, **kwargs)
-#            if not was_initialized:
-#                cls.initialized = False
-#                eb_finalize_library()
-#        return wrapper
 
 
 class EpwingBook(object):
@@ -187,8 +159,8 @@ class EpwingBook(object):
                 for result in self.search(query, subbook['id'], search_method=search_method, search_options=search_options, container=container):
                     yield result
             return
-        else:
-            eb_set_subbook(self.book, int(subbook_id))
+
+        eb_set_subbook(self.book, int(subbook_id))
 
         query_encoded = query.encode('euc-jp')
         self._search_methods[search_method](self.book, query_encoded)
