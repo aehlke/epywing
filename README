@@ -1,4 +1,0 @@
-This is a prototype Python library for reading EPWING-formatted dictionaries,
-particularly for Japanese. It should be easy to use for most purposes.
-
-epywing wraps ebmodule-2.0, which uses eb-3.1.
