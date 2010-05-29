@@ -9,6 +9,7 @@ setup(name='epywing',
     author_email='manabi.org@gmail.com',
     url='http://www.manabi.org/epywing',
     packages=['epywing'],
+    package_dir={'epywing': 'src/epywing'},
     install_requires=[
         'lxml>=2.2.4',
         'ebmodule==2.0',
