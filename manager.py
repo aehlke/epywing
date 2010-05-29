@@ -10,7 +10,21 @@ from itertools import imap
 
 books = {}
 
-def add_books_from_paths(paths):
+#class InstalledBook(object):
+#    '''Represents an EpwingBook which has been 'added' by the user.
+#    '''
+#    _books = []
+    
+#    def __init__(self, book):
+#        self.book = book
+#        InstalledBook._books.append(self)
+    
+# metadata to keep on each book:
+#  order
+#  
+
+
+def add_books(*paths):
     '''`paths` is a list of paths to books to add.
     '''
     for book_path in paths:
@@ -18,8 +32,6 @@ def add_books_from_paths(paths):
         #skip this dictionary if this folder name already exists in loaded books - the danger here is that it might not always skip the same book
         if not books.has_key(key):
             books[key] = EpwingBook(book_path)
-    add_books_from_paths()
-    return _book_list
 
 def find_books_in_path(path_):
     '''Scans the given directory for EPWING books and returns a list of their paths.
