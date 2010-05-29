@@ -14,20 +14,21 @@ from lxml.cssselect import CSSSelector
 
 from mybase64 import urlsafe_b64_encode, urlsafe_b64_decode, _num_decode, _position_to_resource_id
 
+from uris import EpwingURIDispatcher
+from gaiji import gaiji
 
 
 
 class EpwingBook(object):
-    uri_base = '/' #e.g. /dict/ - this should actually have the book_id in it too
-    uri_templates = {'entry': 'subbook/{subbook_id}/entry/{entry_id}',
-                     'subbook': 'subbook/{subbook_id}',
-                     'audio': 'subbook/{subbook_id}/audio/{audio_id}'
-    }
 
     def __init__(self, book_path):
         self.book_path = book_path
+        self.id = urlsafe_b64_encode(path.basename(self.book_path))
         #TODO verify path is valid
         self.name = unicode(path.basename(self.book_path).decode('euc-jp'))#.title())
+
+        self.uri_dispatcher = EpwingURIDispatcher(self)
+
         self.book, self.appendix, self.hookset = EB_Book(), EB_Appendix(), EB_Hookset()
         self._set_hooks()
 
@@ -64,8 +65,6 @@ class EpwingBook(object):
             (EB_HOOK_NARROW_FONT,         self._hook_font),
             (EB_HOOK_WIDE_FONT,           self._hook_font)))
 
-
-
     @property
     def _search_methods(self):
         '''Returns the search methods this dictionary supports, plus the corresponding EB method.
@@ -95,14 +94,18 @@ class EpwingBook(object):
         '''
         ret = []
         for subbook in eb_subbook_list(self.book):
+            id = str(subbook)
             ret.append({ 'name': eb_subbook_title2(self.book, subbook).decode('euc-jp'),
                          'directory': eb_subbook_directory2(self.book, subbook),
-                         'id': str(subbook),
-                         'uri': self.uri_base + self.uri_templates['subbook'].format(subbook_id=str(subbook)) }) #'{0}{1}/'.format(self.URI_prefix, str(subbook)) } )
+                         'id': id,
+                         'uri': self.uri_dispatcher.uri('subbook', subbook_id=id)
+            })
         return ret
 
 
     def entry(self, entry_id, subbook_id, container=None):
+        '''Returns a 2-tuple containing the entry's header and its text contents.
+        '''
         entry_locations = map(_num_decode, entry_id.split(_ENTRY_ID_SPLIT))
         if len(entry_locations) == 4:
             heading_location = (entry_locations[0], entry_locations[1], )
@@ -165,7 +168,7 @@ class EpwingBook(object):
                 content = self._get_content(eb_subbook(self.book), text_location, container, eb_read_text)
                 if string.strip(content):
                     entry_id = _position_to_resource_id([heading_location[0], heading_location[1], text_location[0], text_location[1]])
-                    uri = self.uri_base + self.uri_templates['entry'].format(subbook_id=str(subbook_id), entry_id=entry_id) #'{0}{1}/'.format(self.uri_base, entry_id)
+                    uri = self.uri_dispatcher.uri('entry', subbook_id=subbook_id, entry_id=entry_id)
                     yield (heading, content, subbook_id, entry_id, uri, )
 
     #TODO separate the heading method
@@ -194,8 +197,8 @@ class EpwingBook(object):
             #context->text_end_flag = 1 in 3.1
             position = eb_tell_text(self.book)
 
-        #TODO refactor
         data = unicode(data, 'euc-jp', errors='ignore')
+        #TODO refactor
         data = string.replace(data, u'\x00', '') #remove null characters, which can break lxml's HTML parser
         data = string.replace(data, u'→§', u'§') #''
         data = string.replace(data, u'＝→', u'＝')
@@ -248,7 +251,7 @@ class EpwingBook(object):
     def _write_text_anchor(self, book, position):
         subbook_id = str(eb_subbook(self.book))
         entry_id = _position_to_resource_id(position)
-        uri = self.uri_templates['entry'].format(subbook_id=subbook_id, entry_id=entry_id)
+        uri = self.uri_dispatcher.uri('entry', subbook_id=subbook_id, entry_id=entry_id)
         eb_write_text_string(book, '<a name=\"{0}\" />'.format(uri))
 
     #hooks
@@ -272,7 +275,7 @@ class EpwingBook(object):
         def end_reference():
             subbook_id = str(eb_subbook(self.book))
             entry_id = _position_to_resource_id([argv[1], argv[2]])
-            uri = self.uri_base + self.uri_templates['entry'].format(subbook_id=subbook_id, entry_id=entry_id)
+            uri = self.uri_dispatcher.uri('entry', subbook_id=subbook_id, entry_id=entry_id)
             return '</a><hack_attribs href=\"{0}\" rel=\"subsection\"/>'.format(uri)
             #TODO sometimes the rel will be an entry/keyword (chapter?), or book, etc.
 
@@ -316,82 +319,12 @@ class EpwingBook(object):
             page = int(argv[2])
             offset = int(argv[3])
             audio_id = _position_to_resource_id([page, offset, data_size])
-            uri = self.uri_base + self.uri_templates['audio'].format(subbook_id=subbook_id, audio_id=audio_id)
+            uri = self.uri_dispatcher.uri('audio', subbook_id=subbook_id, audio_id=audio_id)
             eb_write_text_string(self.book, '</a><hack_attribs href=\"{0}\" />'.format(uri))
 
     #TODO refactor hook code into its own module
     #TODO use eb_narrow_font_character_bitmap for unknown ones, using a img tag whose url has the gaiji id
     def _hook_font(self, book, appendix, container, code, argv):
-        gaiji = {
-                EB_HOOK_NARROW_FONT: {
-                    0xa120: '',
-                    0xa121: '* ',
-                    0xa122: '** ',
-                    0xa123: '*** ',
-                    0xa124: 'o ',
-                    0xa126: '《',
-                    0xa127: '》',
-                    0xa128: '〔',
-                    0xa129: '〕',
-                    0xa12a: '〜',
-                    0xa167: 'a',
-                    0xa168: 'e',
-                    0xa169: 'i',
-                    0xa16a: 'o',
-                    0xa16b: 'u',
-                    0xa16c: 'y',
-                    0xa16f: 'I',
-                    0xa17b: 'a',
-                    0xa17c: 'e',
-                    0xa17d: 'i',
-                    0xa17e: 'o',
-                    0xa221: 'u',
-                    0xa233: ':',
-
-                    #remove accents
-                    0xa155: 'a',
-                    0xa12e: 'e',
-                    0xa158: 'e',
-                    0xa15a: 'i',
-                    0xa159: 'i',
-                    0xa15b: 'o',
-                    0xa15c: 'o',
-                    0xa15d: 'u',
-                },
-                EB_HOOK_WIDE_FONT: {
-                    0xa34e: '━',
-                    0xa321: '[名]',
-                    0xa322: '[代]',
-                    0xa323: '[形]',
-                    0xa324: '[動]',
-                    0xa325: '[副]',
-                    0xa327: '[前]',
-                    0xa32f: '[U]',
-                    0xa330: '[C]',
-                    0xa332: '(複)',
-                    0xa333: '[A]',
-                    0xa334: '[P]',
-                    0xa335: '(自)',
-                    0xa336: '(他)',
-                    0xa337: '[成',
-                    0xa338: '句]',
-                    0xa32c: '[接',
-                    0xa32d: '頭]',
-                    0xa32e: '尾]',
-                    0xa339: '§',
-                    0xa33a: '§',
-                    0xa33c: '§',
-                    0xa34f: '⇔',
-
-                    #symbols
-                    0xa43a: '&mdash;',
-                    0xa430: '<span style="border-width:1px; border-style:solid; padding:0px 2px 0px 2px">C</span>',
-                    0xa431: '<span style="border-width:1px; border-style:solid; padding:0px 2px 0px 2px">U</span>',
-
-                    #characters with accents that shouldn't have accents (???)
-                    0xa438: '~',
-                },
-        }
         eb_write_text_string(book, gaiji[code].get(argv[0], '<span title=\"{0:x}\">?</span>'.format(argv[0])))
         return EB_SUCCESS
 
