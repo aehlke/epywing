@@ -23,6 +23,8 @@ from gaiji import gaiji
 class EpwingBook(object):
 
     def __init__(self, book_path):
+        eb_initialize_library()
+
         self.book_path = book_path
         self.id = urlsafe_b64_encode(path.basename(self.book_path))
         #TODO verify path is valid
@@ -40,21 +42,24 @@ class EpwingBook(object):
             #FIXME raise an exception instead
             sys.stderr.write('Error: %s: %s\n' % (code, message))
             sys.exit(1)
+        print self.search_methods
 
-    def __enter__(self):
-        eb_initialize_library()
-        return self
+    #def __enter__(self):
+    #    eb_initialize_library()
+    #    return self
     
-    def __exit__(self, type, value, traceback):
-        eb_finalize_library()
+    #def __exit__(self, type, value, traceback):
+    #    eb_finalize_library()
 
     def _set_hooks(self):
         eb_set_hooks(self.hookset, (
             (EB_HOOK_NEWLINE,             self._hook_new_line),
-            #(EB_HOOK_NULL,                self._hook_null),
-            (EB_HOOK_STOP_CODE,           self._handle_stop_code),
+            (EB_HOOK_NULL,                self._hook_null),
+            #(EB_HOOK_STOP_CODE,           self._handle_stop_code),
             (EB_HOOK_SET_INDENT,          self._hook_set_indent),
-            #(EB_HOOK_BEGIN_CANDIDATE,   self._hook_tags),
+            #(EB_HOOK_BEGIN_CANDIDATE,   self._hook_candidate),
+            #(EB_HOOK_END_CANDIDATE_GROUP, self._hook_candidate),
+            #(EB_HOOK_END_CANDIDATE_LEAF, self._hook_candidate),
             (EB_HOOK_BEGIN_REFERENCE,     self._hook_tags),
             (EB_HOOK_END_REFERENCE,       self._hook_tags),
             (EB_HOOK_BEGIN_KEYWORD,       self._hook_tags),
@@ -63,8 +68,19 @@ class EpwingBook(object):
             (EB_HOOK_END_SUBSCRIPT,       self._hook_tags),
             (EB_HOOK_BEGIN_SUPERSCRIPT,   self._hook_tags),
             (EB_HOOK_END_SUPERSCRIPT,     self._hook_tags),
+            (EB_HOOK_BEGIN_NARROW,        self._hook_tags),
+            (EB_HOOK_END_NARROW,          self._hook_tags),
+            #(EB_HOOK_BEGIN_WIDE,          self._hook_tags),
+            #(EB_HOOK_BEGIN_WIDE,          self._hook_tags),
             (EB_HOOK_NARROW_FONT,         self._hook_font),
             (EB_HOOK_WIDE_FONT,           self._hook_font)))
+
+    #def _hook_candidate(self):
+    def _hook_candidate(self, book, appendix, container, code, argv):
+        print "CANDIDATE:",
+        print str(argv)
+        eb_write_text_string(book, 'CANDIDATE'+str(argv))
+        return EB_SUCCESS
 
     @property
     def _search_methods(self):
@@ -155,6 +171,8 @@ class EpwingBook(object):
                     yield result
             return
 
+        if container:
+            container.clazz = self.book
         eb_set_subbook(self.book, int(subbook_id))
 
         query_encoded = query.encode('euc-jp')
@@ -167,10 +185,15 @@ class EpwingBook(object):
             for heading_location, text_location in hits:
                 heading = self._get_content(eb_subbook(self.book), heading_location, container, eb_read_heading)
                 content = self._get_content(eb_subbook(self.book), text_location, container, eb_read_text)
+                #content = 'content blah'
                 if string.strip(content):
                     entry_id = _position_to_resource_id([heading_location[0], heading_location[1], text_location[0], text_location[1]])
                     uri = self.uri_dispatcher.uri('entry', subbook_id=subbook_id, entry_id=entry_id)
-                    yield (heading, content, subbook_id, entry_id, uri, )
+                    #yield (heading, content, subbook_id, entry_id, uri, )
+                    #TODO make this dictionary lazy
+                    #print 'heading:',
+                    #print heading
+                    yield {'heading': heading, 'content': content, 'subbook_id': subbook_id, 'entry_id': entry_id, 'uri': uri}
 
     #TODO separate the heading method
     def _get_content(self, subbook, position, container, content_method, packed=False, entry_count=1):
@@ -199,13 +222,15 @@ class EpwingBook(object):
             position = eb_tell_text(self.book)
 
         data = unicode(data, 'euc-jp', errors='ignore')
+        if content_method == eb_read_heading:
+            print data
         #TODO refactor
         data = string.replace(data, u'\x00', '') #remove null characters, which can break lxml's HTML parser
         data = string.replace(data, u'→§', u'§') #''
         data = string.replace(data, u'＝→', u'＝')
         data = string.replace(data, u'⇒→', u'⇒')
         data = string.replace(data, u'⇔→', u'⇔')
-        data = self._fix_html_hacks(data)
+        #data = self._fix_html_hacks(data)
         return data
 
 
@@ -273,6 +298,11 @@ class EpwingBook(object):
 
     #TODO set_indent hook
     def _hook_tags(self, book, appendix, container, code, argv):
+        if code == EB_HOOK_BEGIN_NARROW:
+            print 'BEGINNING NARROW'
+        elif code == EB_HOOK_END_NARROW:
+            print 'ENDING NARROW'
+        print code
         def end_reference():
             subbook_id = str(eb_subbook(self.book))
             entry_id = _position_to_resource_id([argv[1], argv[2]])
@@ -283,10 +313,21 @@ class EpwingBook(object):
         def begin_keyword():
             self._write_text_anchor(book, eb_tell_text(book))
             return '<span class="keyword">'
+        #print 'h:'
+        #print str(dir(container))
+
+        def narrow_font():
+            try:
+                text = eb_narrow_alt_character_text(self.appendix, code)
+            except EBError:
+                text = '?'
+            #self.write_text(text)
+            return text
 
         hooks = { EB_HOOK_BEGIN_REFERENCE:    '<a>',
                   EB_HOOK_END_REFERENCE:      end_reference,
                   EB_HOOK_BEGIN_KEYWORD:      begin_keyword,
+                  EB_HOOK_BEGIN_NARROW:       narrow_font,
                   EB_HOOK_END_KEYWORD:        '</span>',
                   EB_HOOK_BEGIN_SUBSCRIPT:    '<sub>',
                   EB_HOOK_END_SUBSCRIPT:      '</sub>',
@@ -295,18 +336,19 @@ class EpwingBook(object):
                   EB_HOOK_BEGIN_EMPHASIS:     '<em>',
                   EB_HOOK_END_EMPHASIS:       '</em>', }
 
-        text = hooks[code]
+        text = hooks.get(code, None)#[code]
         if callable(text):
             text = text()
-        eb_write_text_string(book, text)
+        if text:
+            eb_write_text_string(book, text)
         return EB_SUCCESS
 
-    def _handle_stop_code(self, book, appendix, container, code, argv):
-        #eb_write_text_string(book, '[{0},{1}]'.format(argv[0],argv[1]))
-        if int(argv[1]) == 1: #end of entry
-            self._buffer_entry_count += 1
-            eb_write_text_string(book, '<hr>') #TODO entry div tags
-        return eb_hook_stop_code(book, appendix, container, code, argv)
+    #def _handle_stop_code(self, book, appendix, container, code, argv):
+    #    #eb_write_text_string(book, '[{0},{1}]'.format(argv[0],argv[1]))
+    #    if int(argv[1]) == 1: #end of entry
+    #        self._buffer_entry_count += 1
+    #        eb_write_text_string(book, '<hr>') #TODO entry div tags
+    #    return eb_hook_stop_code(book, appendix, container, code, argv)
 
     def _hook_wave(self, book, appendix, container, code, argv):
         if code == EB_HOOK_BEGIN_WAVE:

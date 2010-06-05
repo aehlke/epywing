@@ -45,7 +45,7 @@ class HistoryManager(object):
             # Can't go back when _back contains a single entry,
             # since its last entry is used to store the current location.
             raise IndexError
-        self._forward.appendLeft(self._back.pop())
+        self._forward.appendleft(self._back.pop())
         return self.current_location
     
     def forward(self):
@@ -69,11 +69,11 @@ class HistoryManager(object):
 
     @property
     def back_items(self):
-        return self._back[1:]
+        return list(self._back)[:-1] # remove the current location
     
     @property
     def forward_items(self):
-        return self._forward[:]
+        return list(self._forward)
 
     def __contains__(self, val):
         return val in self._back or val in self._forward
