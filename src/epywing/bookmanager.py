@@ -47,31 +47,32 @@ class BookManager(object):
         '''
         for book in self.books.values():
             for result in islice(book.search(query, **kwargs), 0, max_results_per_book):
-                result['book'] = book
+                #result['book'] = book
                 yield result
 
 
-    def search_all_combined(self, query, max_results_per_book=50, **kwargs):
-        '''Searches all books and combines their top 50 (by default) results.
-        Return a structure like:
-            [{'heading': 'test', 'results': test_results},]
-        where `test_results` is a list of search result dicts.
-        '''
-        # consume the iterator
-        results = list(self.search_all(query, max_results_per_book=max_results_per_book, **kwargs))
-        #print results
+    #def search_all_combined(self, query, max_results_per_book=50, **kwargs):
+    #    '''Searches all books and combines their top 50 (by default) results.
+    #    Return a structure like:
+    #        [{'heading': 'test', 'results': test_results},]
+    #    where `test_results` is a list of search result dicts.
+    #    '''
+    #    # consume the iterator
+    #    results = list(self.search_all(query, max_results_per_book=max_results_per_book, **kwargs))
+    #    #print results
 
-        # combine the results by `heading` key
-        combined_results = defaultdict(list)
-        for result in results:
-            result2 = result.copy()
-            del result2['heading']
-            combined_results[result['heading']].append(result2)
+    #    # combine the results by `heading` key
+    #    combined_results = defaultdict(list)
+    #    for result in results:
+    #        result2 = result.copy()
+    #        #del result2['heading']
+    #        #combined_results[result['heading']].append(result2)
 
-        # sort the combined results
-        sorted_results = [{'heading': key, 'results': val} 
-                for key, val in sorted(combined_results.items())]
-        return sorted_results
+
+    #    # sort the combined results
+    #    sorted_results = [{'heading': key, 'results': val} 
+    #            for key, val in sorted(combined_results.items())]
+    #    return sorted_results
 
 
 

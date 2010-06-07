@@ -5,9 +5,9 @@ from eb import *
 gaiji = {
     EB_HOOK_NARROW_FONT: {
         0xa120: '',
-        0xa121: '* ',
-        0xa122: '** ',
-        0xa123: '*** ',
+        #0xa121: '* ',
+        #0xa122: '** ',
+        #0xa123: '*** ',
         0xa124: 'o ',
         0xa126: '《',
         0xa127: '》',
@@ -37,6 +37,14 @@ gaiji = {
         0xa15b: 'o',
         0xa15c: 'o',
         0xa15d: 'u',
+
+        0xa122: 'a',
+        0xa33b: 'y',
+        0xa15e: 'u',
+
+        # other ones I've found
+        0xa235: '/',
+
     },
     EB_HOOK_WIDE_FONT: {
         0xa34e: '━',
