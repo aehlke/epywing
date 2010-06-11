@@ -9,14 +9,16 @@ import sys
 from os import path
 import string
 from itertools import izip, cycle
-#from lxml import html
-#from lxml.cssselect import CSSSelector
+from lxml import html
+from lxml.cssselect import CSSSelector
 
 from mybase64 import urlsafe_b64_encode, urlsafe_b64_decode, _num_decode, _position_to_resource_id
 
 from uris import EpwingURIDispatcher
 from gaiji import gaiji
 import util
+#from japanese import jis_x_0208
+import struct
 
 #TODO refactor hooks - DRY
 
@@ -28,6 +30,9 @@ class Container(object):
     EARLY_ENTRY_TERMINATOR = '__EARLY_ENTRY_TERMINATOR__'
     def __init__(self, debug_mode=False):
         self.debug_mode = debug_mode
+        self.reference_stack = []
+        self.decoration_stack = None
+        self.buffer = u''
         pass
 
 class Entry(object):
@@ -201,7 +206,8 @@ class EpwingBook(object):
         self._buffer_start_position = position
         data = ''
         eb_seek_text(self.book, position)
-        for i in xrange(40):
+
+        for i in xrange(200):
             buffer = []
             while True:
                 data_chunk = content_method(self.book, self.appendix, self.hookset, container)
@@ -213,14 +219,6 @@ class EpwingBook(object):
             if container.read_count == 1 and container.indent_stop_code_count >= 1:
                 container.indent_stop_code_in_first_read = True
 
-            #if container.read_count > 1:
-               #if container.indent_stop_code_in_first_read:
-                   #if container.indent_stop_code_count > 1:
-                       #break
-               #else:
-                   #if container.indent_stop_code_count >= 1:
-                       #break
-
             data += ''.join(buffer)
 
             i = data.find(container.EARLY_ENTRY_TERMINATOR)
@@ -231,18 +229,7 @@ class EpwingBook(object):
             if content_method == eb_read_heading:
                 break
 
-            #if container.indent_stop_code_in_first_read:
-                #if container.indent_stop_code_count > 1:
-                    #break
-            #else:
-                #if container.indent_stop_code_count > 0:
-                    #break
-
             eb_forward_text(self.book, self.appendix)
-
-            #ending of content text_status in 4.2 is EB_TEXT_STATUS_HARD_STOP
-            #context->text_end_flag = 1 in 3.1
-            #position = eb_tell_text(self.book)
 
         data = unicode(data, 'euc-jp', errors='ignore')
 
@@ -250,13 +237,53 @@ class EpwingBook(object):
         #    print data
         #TODO refactor
         #data = string.replace(data, u'\x00', '') #remove null characters, which can break lxml's HTML parser
-        #data = string.replace(data, u'→§', u'§') #''
-        #data = string.replace(data, u'＝→', u'＝')
-        #data = string.replace(data, u'⇒→', u'⇒')
-        #data = string.replace(data, u'⇔→', u'⇔')
-        #data = self._fix_html_hacks(data)
+        data = string.replace(data, u'→§', u'§') #''
+        data = string.replace(data, u'＝→', u'＝')
+        data = string.replace(data, u'⇒→', u'⇒')
+        data = string.replace(data, u'⇔→', u'⇔')
+        if content_method != eb_read_heading:
+            data = self._fix_html_hacks(data)
         return data
 
+    def _fix_html_hacks(self, text):
+        text = u'<div>{0}</div>'.format(text)
+        doc = html.fromstring(text)
+        
+        #rewrite attributes
+        for hack_tag in doc.cssselect('hack_attribs'):
+            prev_tag = hack_tag.getprevious()
+            attribs = dict((key, val) for key, val in hack_tag.attrib.items())
+            prev_tag.attrib.update(attribs)
+            hack_tag.drop_tag()
+        
+        #fix indentation divs
+        hack_divs = doc.cssselect('hack_indent')
+        to_drop = []
+        for hack_div in hack_divs:
+            indent_div = html.Element('div')
+            attribs = dict((key, val) for key, val in hack_div.attrib.items())
+            indent_div.attrib.update(attribs)
+            hack_div.addnext(indent_div)
+            hack_div.drop_tag()
+            indent_div.text = indent_div.tail
+            indent_div.tail = ''
+        
+            for sibling in indent_div.itersiblings():
+                if sibling.tag == 'hack_indent':
+                    #merge identical ident divs
+                    if sibling.attrib.has_key('style') and sibling.attrib['style'] == indent_div.attrib['style']:
+                        indent_div.append(sibling)
+                        hack_divs.remove(sibling)
+                        sibling.drop_tag()
+                    else:
+                        break
+                else:
+                    indent_div.append(sibling)        
+        
+        #remove surrounding div #TODO find a better way
+        doc = html.tostring(doc)[5:]
+        doc = doc[:-6]
+        return doc
 
     def _set_hooks(self):
         eb_set_hooks(self.hookset, (
@@ -285,13 +312,22 @@ class EpwingBook(object):
             #(EB_HOOK_BEGIN_WIDE,         self._hook_tags),
             #(EB_HOOK_BEGIN_WIDE,         self._hook_tags),
             (EB_HOOK_NARROW_FONT,         self._hook_font),
-            (EB_HOOK_WIDE_FONT,           self._hook_font)))
+            (EB_HOOK_WIDE_FONT,           self._hook_font),
+            (EB_HOOK_BEGIN_DECORATION,    self._hook_tags),
+            (EB_HOOK_END_DECORATION,      self._hook_tags),
+            #(EB_HOOK_NARROW_JISX0208,     self._hook_euc_to_unicode),
+            #(EB_HOOK_WIDE_JISX0208,       self._hook_euc_to_unicode),
+            #(EB_HOOK_GB2312,              self._hook_gb_to_unicode),
+        ))
 
     def _hook_initialize(self, book, appendix, container, code, argv):
         return EB_SUCCESS
 
-    def _hook_candidate(self, book, appendix, container, code, argv):
-        eb_write_text_string(book, 'CANDIDATE'+str(argv))
+    def _hook_euc_to_unicode(self, book, appendix, container, code, argv):
+        if len(argv):
+            bytes = struct.unpack('bb', struct.pack('H', argv[0]))
+            eb_write_text_byte2(book, bytes[1] | 0x80, bytes[0] | 0x80) #working for wide but not narrow
+            #container.buffer += char
         return EB_SUCCESS
 
     def _write_text_anchor(self, book, position):
@@ -304,13 +340,13 @@ class EpwingBook(object):
     #FIXME 'horsey' in chujiten is messed up, see ebview for correct one
     def _hook_new_line(self, book, appendix, container, code, argv):
         eb_write_text_string(book, '<br/>\n')
-        #self._write_text_anchor(book, eb_tell_text(book))#eb_write_text_string(book, '<a name=\"{0}\" />'.format(_position_to_resource_id(eb_tell_text(book))))
         return EB_SUCCESS
 
     def _hook_set_indent(self, book, appendix, container, code, argv):
         if container.debug_mode:
             eb_write_text_string(book, '[{0:x},{1}]'.format(argv[0],argv[1]))
             eb_write_text_string(book, '{'+str(eb_tell_text(book))+'}')
+
         if argv[1] == 1:
             # first indent level is considered a stop code,
             # since it only occurs at the beginning of an entry.
@@ -319,6 +355,7 @@ class EpwingBook(object):
             if container.read_count >= 1:
                 # an unfortunate hack, since sometimes the next entry begins midway through a read
                 eb_write_text_string(book, container.EARLY_ENTRY_TERMINATOR)
+
         padding_width = 10 * int(argv[1]) #TODO refactor indentation padding constant
         eb_write_text_string(book, '<hack_indent style=\"padding-left:{0}\"/>'.format(padding_width))
         return EB_SUCCESS
@@ -329,6 +366,12 @@ class EpwingBook(object):
 
     #TODO set_indent hook
     def _hook_tags(self, book, appendix, container, code, argv):
+        def begin_reference():
+            # add reference start-point to the container
+            #starts_at = container.
+            #container.reference_stack.append()
+            return '<a>'
+
         def end_reference():
             subbook_id = str(eb_subbook(self.book))
             entry_id = _position_to_resource_id([argv[1], argv[2]])
@@ -351,10 +394,27 @@ class EpwingBook(object):
                 text = eb_narrow_alt_character_text(self.appendix, code)
             except EBError:
                 text = '?'
-            #self.write_text(text)
             return text
 
-        hooks = { EB_HOOK_BEGIN_REFERENCE:    '<a>',
+        def begin_decoration():
+            # argv[1] contains the method
+            # 1: italic
+            # ?: emphasis (bold?)
+            method = argv[1]
+            if method == 1 or method == 4353:
+                container.decoration_stack = '</em>'
+                return '<em>'
+            elif method == 4355:
+                container.decoration_stack = '</strong>'
+                return '<strong>'
+
+        def end_decoration():
+            if container.decoration_stack:
+                tag = container.decoration_stack
+                container.decoration_stack = None
+                return tag
+
+        hooks = { EB_HOOK_BEGIN_REFERENCE:    begin_reference,
                   EB_HOOK_END_REFERENCE:      end_reference,
                   EB_HOOK_BEGIN_KEYWORD:      begin_keyword,
                   EB_HOOK_BEGIN_NARROW:       narrow_font,
@@ -367,7 +427,10 @@ class EpwingBook(object):
                   EB_HOOK_BEGIN_SUPERSCRIPT:  '<sup>',
                   EB_HOOK_END_SUPERSCRIPT:    '</sup>',
                   EB_HOOK_BEGIN_EMPHASIS:     '<em>',
-                  EB_HOOK_END_EMPHASIS:       '</em>', }
+                  EB_HOOK_END_EMPHASIS:       '</em>',
+                  EB_HOOK_BEGIN_DECORATION:   begin_decoration,
+                  EB_HOOK_END_DECORATION:     end_decoration,
+        }
 
         text = hooks.get(code, '!')#[code]
         if callable(text):
@@ -438,3 +501,23 @@ if __name__ == "__main__":
         #print(u'{0}:\n{1}'.format(h, c))
     eb_finalize_library()
 
+#typedef struct _SContainer {
+#    id          clazz;
+#    id          string;
+#    NSMutableArray* styles;
+#    NSMutableArray* links;
+#    int         range;
+#    bool                gaiji;
+#    NSMutableData*  raw;
+#} SContainer;
+#buffer[sizeof(buffer) - 1] = '\0';
+#bufferString = [NSMutableString stringWithCapacity:64];
+#container.string = bufferString;
+#container.clazz = self;
+#container.styles = NULL;
+#container.gaiji = FALSE;
+#container.raw = NULL;
+#container.styles = None
+#container.gaiji = False
+#container.raw = None
+#contaianer.clazz = 

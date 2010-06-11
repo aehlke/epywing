@@ -41,6 +41,7 @@ gaiji = {
         0xa122: 'a',
         0xa33b: 'y',
         0xa15e: 'u',
+        0xa16d: 'E',
 
         # other ones I've found
         0xa235: '/',
@@ -75,6 +76,7 @@ gaiji = {
         0xa43a: '&mdash;',
         0xa430: '<span style="border-width:1px; border-style:solid; padding:0px 2px 0px 2px">C</span>',
         0xa431: '<span style="border-width:1px; border-style:solid; padding:0px 2px 0px 2px">U</span>',
+        0xa433: '<span style="border-width:1px; border-style:solid; padding:0px 2px 0px 2px">D</span>',
 
         #characters with accents that shouldn't have accents (???)
         0xa438: '~',
