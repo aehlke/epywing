@@ -17,7 +17,6 @@ from mybase64 import urlsafe_b64_encode, urlsafe_b64_decode, _num_decode, _posit
 from uris import EpwingURIDispatcher
 from gaiji import gaiji
 import util
-#from japanese import jis_x_0208
 import struct
 
 #TODO refactor hooks - DRY
@@ -82,7 +81,7 @@ class Entry(object):
 class EpwingBook(object):
 
     def __init__(self, book_path):
-        self.book_path = book_path
+        self.book_path = book_path.encode('utf-8')
         self.id = urlsafe_b64_encode(path.basename(self.book_path))
         #TODO verify path is valid
         self.name = unicode(path.basename(self.book_path).decode('euc-jp'))#.title())
@@ -435,12 +434,9 @@ class EpwingBook(object):
         text = hooks.get(code, '!')#[code]
         if callable(text):
             text = text()
-        #if text:
         if text is not None:
             eb_write_text_string(book, text)
         #eb_write_text_string(self.book,'k'+str(self.book.text_status())+str(self.book.auto_stop_code))
-        #else:
-            #print 'NOPE!!!!!!!!!!!!!'
         return EB_SUCCESS
 
     def _hook_wave(self, book, appendix, container, code, argv):
@@ -465,7 +461,6 @@ class EpwingBook(object):
             #pass
             ##print 'narrow1'
             ##self.hook_narrow_font(container, argv[0])
-            ##eb_write_text_string(book, "333333333333333333333333333333333333333333<gaiji=h%04x>" % code)
             ##eb_write_text_string(book, "<gaiji=h%04x>" % code)
         #elif code == EB_HOOK_WIDE_FONT:
             #pass

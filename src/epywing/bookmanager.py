@@ -1,5 +1,3 @@
-
-
 from glob import glob
 from os import path
 
@@ -12,32 +10,55 @@ EPWING_IDENTIFYING_FILENAMES = ['CATALOGS', 'catalogs', 'CATALOG', 'catalog',]
 
 class BookManager(object):
     '''Manage a set of epwing dictionaries, to do things like searching all available books.
+    `self.books` is a dictionary that maps book ID to EpwingBook instance.
     '''
     def __init__(self):
         self.books = {}
 
     def add_books(self, *paths):
         '''`paths` is a list of paths to books to add.
+        Returns a dictionary that is a subset of `self.books`, containing only the newly added ones.
         '''
+        new_books = {}
         for book_path in paths:
             book = EpwingBook(book_path)
             #skip this dictionary if this folder name already exists in loaded books - the danger here is that it might not always skip the same book
             key = book.id
             if not self.books.has_key(key):
-                self.books[key] = book
+                new_books[key] = self.books[key] = book
+        return new_books
 
-    def find_books_in_path(self, path_):
+    def remove_book(self, book_id):
+        del self.books[book_id]
+    
+    @property
+    def book_paths(self):
+        '''Returns a list of the paths for all installed books.
+        '''
+        return [book.book_path for book in self.books.values()]
+
+    def path_is_epwing_book(self, path_):
+        '''Returns whether `path_` is an EPWING book.
+        '''
+        for filename in EPWING_IDENTIFYING_FILENAMES:
+            if path.exists(path.join(path_, filename)):
+                return True
+        return False
+
+    def find_books_in_path(self, path_, n_deep=2):
         '''Scans the given directory for EPWING books and returns a list of their paths.
         '''
         paths = []
+        #print n_deep
+        #if path.exists(path.join(path_, 
+        if self.path_is_epwing_book(path_):
+            return [path_]
         for item in glob(path.join(path_, '*')):
             if path.isdir(item) or path.islink(item):
-                for filename in EPWING_IDENTIFYING_FILENAMES:
-                    if path.exists(path.join(item, filename)):
-                        paths.append(item)
-                        break
-            else:
-                paths.extend(self.find_books_in_path(item))
+                if self.path_is_epwing_book(item):
+                    paths.append(item)
+                elif n_deep:
+                    paths.extend(self.find_books_in_path(item, n_deep=n_deep - 1))
         return paths
 
 

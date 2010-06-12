@@ -5,20 +5,20 @@ from eb import *
 gaiji = {
     EB_HOOK_NARROW_FONT: {
         0xa120: '',
-        #0xa121: '* ',
-        #0xa122: '** ',
-        #0xa123: '*** ',
+        0xa121: '* ',
+        0xa122: '** ',
+        0xa123: '*** ',
         0xa124: 'o ',
         0xa126: '《',
         0xa127: '》',
         0xa128: '〔',
         0xa129: '〕',
-        0xa12a: '〜',
+        0xa12a: '〜', #TODO span class= for any occurences
         0xa167: 'a',
         0xa168: 'e',
         0xa169: 'i',
         0xa16a: 'o',
-        0xa16b: 'u',
+        0xa16b: 'a',
         0xa16c: 'y',
         0xa16f: 'I',
         0xa17b: 'a',
@@ -36,7 +36,7 @@ gaiji = {
         0xa159: 'i',
         0xa15b: 'o',
         0xa15c: 'o',
-        0xa15d: 'u',
+        #0xa15d: 'u',
 
         0xa122: 'a',
         0xa33b: 'y',
@@ -76,9 +76,10 @@ gaiji = {
         0xa43a: '&mdash;',
         0xa430: '<span style="border-width:1px; border-style:solid; padding:0px 2px 0px 2px">C</span>',
         0xa431: '<span style="border-width:1px; border-style:solid; padding:0px 2px 0px 2px">U</span>',
+        0xa432: '<span style="border-width:1px; border-style:solid; padding:0px 2px 0px 2px">S</span>',
         0xa433: '<span style="border-width:1px; border-style:solid; padding:0px 2px 0px 2px">D</span>',
 
         #characters with accents that shouldn't have accents (???)
-        0xa438: '~',
+        0xa438: '~', # this one shows up in headings
     },
 }
