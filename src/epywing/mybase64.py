@@ -29,8 +29,10 @@ def _num_decode(s):
     return n
 
 def urlsafe_b64_encode(s):
-    return urlsafe_b64encode2(s).strip('=')
+    s2 = s.encode('utf-8')
+    return urlsafe_b64encode2(s2).strip('=')
 
 def urlsafe_b64_decode(s):
+    #TODO makae sure this decodes properly, given the above change
     return urlsafe_b64decode2(s + '=' * (lambda x: ((5 - x) - 1) % 4)(len(s)))
 

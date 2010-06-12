@@ -81,21 +81,22 @@ class Entry(object):
 class EpwingBook(object):
 
     def __init__(self, book_path):
-        self.book_path = book_path.encode('utf-8')
+        self.book_path = book_path
         self.id = urlsafe_b64_encode(path.basename(self.book_path))
         #TODO verify path is valid
-        self.name = unicode(path.basename(self.book_path).decode('euc-jp'))#.title())
+        self.name = path.basename(self.book_path)
         self.uri_dispatcher = EpwingURIDispatcher(self)
         self.book, self.appendix, self.hookset = EB_Book(), EB_Appendix(), EB_Hookset()
         self._set_hooks()
 
         try:
-            eb_bind(self.book, self.book_path)
+            eb_bind(self.book, self.book_path.encode('utf-8'))
         except EBError, (error, message):
             code = eb_error_string(error)
             #FIXME raise an exception instead
-            sys.stderr.write('Error: %s: %s\n' % (code, message))
-            sys.exit(1)
+            #print 'Error: %s: %s\n' % (code, message)
+            raise Exception('Error: %s: %s\n' % (code, message))
+            #sys.exit(1)
 
     #def __enter__(self):
     #    eb_initialize_library()

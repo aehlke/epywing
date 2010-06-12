@@ -21,7 +21,12 @@ class BookManager(object):
         '''
         new_books = {}
         for book_path in paths:
-            book = EpwingBook(book_path)
+            try:
+                book = EpwingBook(book_path)
+            except Exception as e:
+                # some kind of binding error, so don't import this book - just ignore it, and don't include it in the return value
+                #TODO have a better custom exception or something for this so we don't catch all Exceptions
+                continue
             #skip this dictionary if this folder name already exists in loaded books - the danger here is that it might not always skip the same book
             key = book.id
             if not self.books.has_key(key):

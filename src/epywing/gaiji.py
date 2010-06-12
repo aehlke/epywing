@@ -46,6 +46,7 @@ gaiji = {
         # other ones I've found
         0xa235: '/',
 
+        #0xa241: 'ê',    
     },
     EB_HOOK_WIDE_FONT: {
         0xa34e: '━',
@@ -78,6 +79,12 @@ gaiji = {
         0xa431: '<span style="border-width:1px; border-style:solid; padding:0px 2px 0px 2px">U</span>',
         0xa432: '<span style="border-width:1px; border-style:solid; padding:0px 2px 0px 2px">S</span>',
         0xa433: '<span style="border-width:1px; border-style:solid; padding:0px 2px 0px 2px">D</span>',
+
+        #found from readers+plus
+        0xb122: '<span style="border-width:1px; border-style:solid; padding:0px 2px 0px 2px">P</span>',
+        0xb122: '<span style="border-width:1px; border-style:solid; padding:0px 2px 0px 2px">R</span>',
+        0xb121: '-',
+        #0xb121: '━', #this breaks it for some reason
 
         #characters with accents that shouldn't have accents (???)
         0xa438: '~', # this one shows up in headings

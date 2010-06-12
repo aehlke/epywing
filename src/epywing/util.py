@@ -1,4 +1,4 @@
-from HTMLParser import HTMLParser
+from HTMLParser import HTMLParser, HTMLParseError
 
 class MLStripper(HTMLParser):
     def __init__(self):
@@ -13,6 +13,10 @@ def strip_tags(html):
     '''Returns the string minus any HTML.
     '''
     s = MLStripper()
-    s.feed(html)
+    try:
+        s.feed(html)
+    except HTMLParseError:
+        # some parse error
+        return html
     return s.get_data()
 
