@@ -1,6 +1,80 @@
 # -*- coding: utf-8 -*-
 
 from eb import *
+import re
+
+class GaijiHandler(object):
+    '''Basic gaiji handler that returns gaiji PNG data embedded in <img> tags.
+    This is generic and will work on any EPWING book.
+    '''
+
+    GAIJI_TEMPLATE = u'<gaiji c="{width}{index:04x}"/>'
+    _GAIJI_REGEX = r'<gaiji\s+c\s*=\s*"(([zh])([0-9a-fA-F]{4,4}))"\s*/>'
+    GAIJI_REGEX = re.compile(_GAIJI_REGEX)
+    GAIJI_WIDTHS = {EB_HOOK_NARROW_FONT: 'h', EB_HOOK_WIDE_FONT: 'z'}
+
+    def __init__(self, parent):
+        '''`parent` should be an EpwingBook instance.
+        '''
+        self.parent = parent
+
+    def tag(self, width_code, index):
+        '''Returns a <gaiji> tag.
+        '''
+        return self.GAIJI_TEMPLATE.format(width=self.GAIJI_WIDTHS[width_code], index=index)
+
+    def _replace_gaiji(self, match):
+        width = match.group(2)
+        code = match.group(3)
+        #return gaiji.get(widths[width], EB_HOOK_NARROW_FONT).get(int(code, 16), u'?')
+        return '$'
+
+    def replace_gaiji(self, html):
+        '''Replaces any <gaiji> tags in `html` with the proper <img> tags.
+        '''
+        return self.GAIJI_REGEX.sub(self._replace_gaiji, html)
+        #for match in pat.finditer(data):
+        #eb_write_text_string(book, gaiji[code].get(argv[0], \
+        #        #'<span title=\"{0:x}\">?</span>'\
+        #        u'[{0:x}]'
+        #        .format(argv[0])).encode('euc-jp'))
+        #data = pat.sub(replace_gaiji, data)
+
+    @property
+    def font_sizes(self):
+        return self._font_sizes.keys()
+    
+    @property
+    def _font_sizes(self):
+        return {16: EB_FONT_16, 24: EB_FONT_24, 30: EB_FONT_30, 48: EB_FONT_48}
+    
+    def gif(self, width_code, index, font_size):
+        '''Returns the bytes to a GIF representation of the given gaiji character.
+        `width_code` is the `code` parameter of the hook that specifies font width
+        `font_size` is either 'small' or 'large'
+        '''
+        #TODO error handling
+        book = parent.book
+        font_size2 = self._font_sizes[font_size]
+        #fontsize = (size == kFontImageSizeLarge) ? _largeFontType : _smallFontType;
+  
+        eb_set_font(book, font_size2)
+        height = eb_font_height(book)
+        
+        if width_code == EB_HOOK_NARROW_FONT:
+            width = eb_narrow_font_width(book)
+            bitmap = eb_narrow_font_character_bitmap(book, index)
+        else:
+            width = eb_wide_font_width(book)
+            bitmap = eb_wide_font_character_bitmap(book, index)
+
+        gif = eb_bitmap_to_gif(bitmap, width, height)
+        eb_unset_font(book)
+        return gif
+
+
+
+
 
 gaiji = {
     EB_HOOK_NARROW_FONT: {

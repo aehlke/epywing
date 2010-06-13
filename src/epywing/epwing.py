@@ -16,7 +16,7 @@ import re
 from mybase64 import urlsafe_b64_encode, urlsafe_b64_decode, _num_decode, _position_to_resource_id
 
 from uris import EpwingURIDispatcher
-from gaiji import gaiji
+from gaiji import gaiji, GaijiHandler
 import util
 import struct
 
@@ -38,7 +38,6 @@ class Container(object):
 class Entry(object):
     '''Represents an entry in an EPWING dictionary.
     '''
-
 
     def __init__(self, parent, subbook_id, heading_location, text_location): #entry_locations):
         '''`parent` is an EpwingBook instance.
@@ -79,28 +78,10 @@ class Entry(object):
     def uri(self):
         return self.parent.uri_dispatcher.uri('entry', subbook_id=self.subbook_id, entry_id=entry_id)
          
-class GaijiHandler(object):
-    '''Basic gaiji handler that returns gaiji PNG data embedded in <img> tags.
-    This is generic and will work on any EPWING book.
-    '''
 
-    GAIJI_TEMPLATE = u'<gaiji c="{width}{index:04x}"/>'
-    GAIJI_REGEX = r'<gaiji\s+c\s*=\s*"(([zh])([0-9a-fA-F]{4,4}))"\s*/>'
-    GAIJI_WIDTHS = {EB_HOOK_NARROW_FONT: 'h', EB_HOOK_WIDE_FONT: 'z'}
-
-    def __init__(self, parent):
-        '''`parent` should be an EpwingBook instance.
-        '''
-        self.parent = parent
-
-    def tag(self, width_code, index):
-        '''Returns a <gaiji> tag.
-        '''
-        return self.GAIJI_TEMPLATE.format(width=self.GAIJI_WIDTHS[width_code], index=index))
 
 
 class EpwingBook(object):
-
 
     def __init__(self, book_path, gaiji_handler=None):
         '''`gaiji_handler` is a handler class, not an instance.
@@ -260,7 +241,8 @@ class EpwingBook(object):
         data = unicode(data, 'euc-jp', errors='ignore')
 
         # replace gaiji
-        pat = re.compile(self.GAIJI_REGEX)
+        data = self.gaiji_handler.replace_gaiji(data)
+        #pat = re.compile(self.GAIJI_REGEX)
         #for match in pat.finditer(data):
         #eb_write_text_string(book, gaiji[code].get(argv[0], \
         #        #'<span title=\"{0:x}\">?</span>'\
@@ -333,24 +315,20 @@ class EpwingBook(object):
             #(EB_HOOK_NULL,                self._hook_null),
             #(EB_HOOK_STOP_CODE,           self._handle_stop_code),
             (EB_HOOK_SET_INDENT,          self._hook_set_indent),
-            #(EB_HOOK_BEGIN_CANDIDATE,     self._hook_candidate),
-            #(EB_HOOK_END_CANDIDATE_GROUP, self._hook_candidate),
-            #(EB_HOOK_END_CANDIDATE_LEAF,  self._hook_candidate),
             (EB_HOOK_BEGIN_REFERENCE,     self._hook_tags),
             (EB_HOOK_END_REFERENCE,       self._hook_tags),
             (EB_HOOK_BEGIN_KEYWORD,       self._hook_tags),
             (EB_HOOK_END_KEYWORD,         self._hook_tags),
             (EB_HOOK_BEGIN_SUBSCRIPT,     self._hook_tags),
             (EB_HOOK_END_SUBSCRIPT,       self._hook_tags),
-            #(EB_HOOK_BEGIN_SUPERSCRIPT,   self._hook_tags),
-            #(EB_HOOK_END_SUPERSCRIPT,     self._hook_tags),
+            (EB_HOOK_BEGIN_SUPERSCRIPT,   self._hook_tags),
+            (EB_HOOK_END_SUPERSCRIPT,     self._hook_tags),
             (EB_HOOK_BEGIN_NARROW,        self._hook_tags),
             (EB_HOOK_END_NARROW,          self._hook_tags),
             (EB_HOOK_BEGIN_NO_NEWLINE,    self._hook_tags),
             (EB_HOOK_END_NO_NEWLINE,      self._hook_tags),
             (EB_HOOK_BEGIN_EMPHASIS,      self._hook_tags),
             (EB_HOOK_END_EMPHASIS,        self._hook_tags),
-            #(EB_HOOK_BEGIN_WIDE,         self._hook_tags),
             #(EB_HOOK_BEGIN_WIDE,         self._hook_tags),
             (EB_HOOK_NARROW_FONT,         self._hook_font),
             (EB_HOOK_WIDE_FONT,           self._hook_font),
@@ -364,12 +342,12 @@ class EpwingBook(object):
     def _hook_initialize(self, book, appendix, container, code, argv):
         return EB_SUCCESS
 
-    def _hook_euc_to_unicode(self, book, appendix, container, code, argv):
-        if len(argv):
-            bytes = struct.unpack('bb', struct.pack('H', argv[0]))
-            eb_write_text_byte2(book, bytes[1] | 0x80, bytes[0] | 0x80) #working for wide but not narrow
-            #container.buffer += char
-        return EB_SUCCESS
+    #def _hook_euc_to_unicode(self, book, appendix, container, code, argv):
+    #    if len(argv):
+    #        bytes = struct.unpack('bb', struct.pack('H', argv[0]))
+    #        eb_write_text_byte2(book, bytes[1] | 0x80, bytes[0] | 0x80) #working for wide but not narrow
+    #        #container.buffer += char
+    #    return EB_SUCCESS
 
     def _write_text_anchor(self, book, position):
         subbook_id = str(eb_subbook(self.book))
@@ -407,12 +385,6 @@ class EpwingBook(object):
 
     #TODO set_indent hook
     def _hook_tags(self, book, appendix, container, code, argv):
-        def begin_reference():
-            # add reference start-point to the container
-            #starts_at = container.
-            #container.reference_stack.append()
-            return '<a>'
-
         def end_reference():
             subbook_id = str(eb_subbook(self.book))
             entry_id = _position_to_resource_id([argv[1], argv[2]])
@@ -455,7 +427,7 @@ class EpwingBook(object):
                 container.decoration_stack = None
                 return tag
 
-        hooks = { EB_HOOK_BEGIN_REFERENCE:    begin_reference,
+        hooks = { EB_HOOK_BEGIN_REFERENCE:    '<a>',
                   EB_HOOK_END_REFERENCE:      end_reference,
                   EB_HOOK_BEGIN_KEYWORD:      begin_keyword,
                   EB_HOOK_BEGIN_NARROW:       narrow_font,
@@ -499,21 +471,8 @@ class EpwingBook(object):
     #TODO refactor hook code into its own module
     #TODO use eb_narrow_font_character_bitmap for unknown ones, using a img tag whose url has the gaiji id
     def _hook_font(self, book, appendix, container, code, argv):
-        #if code == EB_HOOK_NARROW_FONT:
-            ##self.hook_narrow_font(container, argv[0])
-            ##eb_write_text_string(book, "<gaiji=h%04x>" % code)
-        #elif code == EB_HOOK_WIDE_FONT:
-            ##self.hook_wide_font(container, argv[0])
-            ##eb_write_text_string(book, "<gaiji=z%04x>" % code)
-
         # we'll convert the gaiji afterwards, since euc-jp doesn't have everything we need
         eb_write_text_string(book, self.gaiji_handler.tag(code, argv[0]).encode('euc-jp'))
-        #eb_write_text_string(book, self.GAIJI_TEMPLATE.format(width=self.GAIJI_WIDTHS[code], code=argv[0]).encode('euc-jp'))
-        #eb_write_text_string(book, gaiji[code].get(argv[0], \
-        #        #'<span title=\"{0:x}\">?</span>'\
-        #        u'[{0:x}]'
-        #        .format(argv[0])).encode('euc-jp'))
-        #
         return EB_SUCCESS
 
 
