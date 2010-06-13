@@ -11,6 +11,7 @@ import string
 from itertools import izip, cycle
 from lxml import html
 from lxml.cssselect import CSSSelector
+import re
 
 from mybase64 import urlsafe_b64_encode, urlsafe_b64_decode, _num_decode, _position_to_resource_id
 
@@ -37,6 +38,8 @@ class Container(object):
 class Entry(object):
     '''Represents an entry in an EPWING dictionary.
     '''
+
+
     def __init__(self, parent, subbook_id, heading_location, text_location): #entry_locations):
         '''`parent` is an EpwingBook instance.
         #`entry_locations` is a 2- or 4-tuple containing the entry's heading and text offsets.
@@ -76,14 +79,36 @@ class Entry(object):
     def uri(self):
         return self.parent.uri_dispatcher.uri('entry', subbook_id=self.subbook_id, entry_id=entry_id)
          
+class GaijiHandler(object):
+    '''Basic gaiji handler that returns gaiji PNG data embedded in <img> tags.
+    This is generic and will work on any EPWING book.
+    '''
+
+    GAIJI_TEMPLATE = u'<gaiji c="{width}{index:04x}"/>'
+    GAIJI_REGEX = r'<gaiji\s+c\s*=\s*"(([zh])([0-9a-fA-F]{4,4}))"\s*/>'
+    GAIJI_WIDTHS = {EB_HOOK_NARROW_FONT: 'h', EB_HOOK_WIDE_FONT: 'z'}
+
+    def __init__(self, parent):
+        '''`parent` should be an EpwingBook instance.
+        '''
+        self.parent = parent
+
+    def tag(self, width_code, index):
+        '''Returns a <gaiji> tag.
+        '''
+        return self.GAIJI_TEMPLATE.format(width=self.GAIJI_WIDTHS[width_code], index=index))
 
 
 class EpwingBook(object):
 
-    def __init__(self, book_path):
-        self.book_path = book_path
+
+    def __init__(self, book_path, gaiji_handler=None):
+        '''`gaiji_handler` is a handler class, not an instance.
+        '''
+        self.book_path = book_path #TODO verify path is valid
+        self.gaiji_handler = gaiji_handler(self) if gaiji_handler else GaijiHandler(self)
+
         self.id = urlsafe_b64_encode(path.basename(self.book_path))
-        #TODO verify path is valid
         self.name = path.basename(self.book_path)
         self.uri_dispatcher = EpwingURIDispatcher(self)
         self.book, self.appendix, self.hookset = EB_Book(), EB_Appendix(), EB_Hookset()
@@ -207,7 +232,7 @@ class EpwingBook(object):
         data = ''
         eb_seek_text(self.book, position)
 
-        for i in xrange(200):
+        for i in xrange(400):
             buffer = []
             while True:
                 data_chunk = content_method(self.book, self.appendix, self.hookset, container)
@@ -229,18 +254,34 @@ class EpwingBook(object):
             if content_method == eb_read_heading:
                 break
 
+            #FIXME sometimes goes too far now
             eb_forward_text(self.book, self.appendix)
 
         data = unicode(data, 'euc-jp', errors='ignore')
+
+        # replace gaiji
+        pat = re.compile(self.GAIJI_REGEX)
+        #for match in pat.finditer(data):
+        #eb_write_text_string(book, gaiji[code].get(argv[0], \
+        #        #'<span title=\"{0:x}\">?</span>'\
+        #        u'[{0:x}]'
+        #        .format(argv[0])).encode('euc-jp'))
+        #widths = {u'z': EB_HOOK_WIDE_FONT, u'h': EB_HOOK_NARROW_FONT}
+        #def replace_gaiji(match):#width, code):
+        #    width = match.group(2)
+        #    code = match.group(3)
+        #    #width = match.group(2)
+        #    return gaiji.get(widths[width], EB_HOOK_NARROW_FONT).get(int(code, 16), u'?')
+        #data = pat.sub(replace_gaiji, data)
 
         #if content_method == eb_read_heading:
         #    print data
         #TODO refactor
         #data = string.replace(data, u'\x00', '') #remove null characters, which can break lxml's HTML parser
-        data = string.replace(data, u'→§', u'§') #''
-        data = string.replace(data, u'＝→', u'＝')
-        data = string.replace(data, u'⇒→', u'⇒')
-        data = string.replace(data, u'⇔→', u'⇔')
+        #data = string.replace(data, u'→§', u'§') #''
+        #data = string.replace(data, u'＝→', u'＝')
+        #data = string.replace(data, u'⇒→', u'⇒')
+        #data = string.replace(data, u'⇔→', u'⇔')
         if content_method != eb_read_heading:
             data = self._fix_html_hacks(data)
         return data
@@ -459,21 +500,22 @@ class EpwingBook(object):
     #TODO use eb_narrow_font_character_bitmap for unknown ones, using a img tag whose url has the gaiji id
     def _hook_font(self, book, appendix, container, code, argv):
         #if code == EB_HOOK_NARROW_FONT:
-            #pass
-            ##print 'narrow1'
             ##self.hook_narrow_font(container, argv[0])
             ##eb_write_text_string(book, "<gaiji=h%04x>" % code)
         #elif code == EB_HOOK_WIDE_FONT:
-            #pass
-            ##print 'wide1'
             ##self.hook_wide_font(container, argv[0])
             ##eb_write_text_string(book, "<gaiji=z%04x>" % code)
-        #else:
-        eb_write_text_string(book, gaiji[code].get(argv[0], \
-                #'<span title=\"{0:x}\">?</span>'\
-                '[{0:x}]'
-                .format(argv[0])))
+
+        # we'll convert the gaiji afterwards, since euc-jp doesn't have everything we need
+        eb_write_text_string(book, self.gaiji_handler.tag(code, argv[0]).encode('euc-jp'))
+        #eb_write_text_string(book, self.GAIJI_TEMPLATE.format(width=self.GAIJI_WIDTHS[code], code=argv[0]).encode('euc-jp'))
+        #eb_write_text_string(book, gaiji[code].get(argv[0], \
+        #        #'<span title=\"{0:x}\">?</span>'\
+        #        u'[{0:x}]'
+        #        .format(argv[0])).encode('euc-jp'))
+        #
         return EB_SUCCESS
+
 
 
 
