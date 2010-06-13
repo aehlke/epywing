@@ -2,6 +2,7 @@
 
 from eb import *
 import re
+from base64 import b64encode
 
 class GaijiHandler(object):
     '''Basic gaiji handler that returns gaiji PNG data embedded in <img> tags.
@@ -12,6 +13,9 @@ class GaijiHandler(object):
     _GAIJI_REGEX = r'<gaiji\s+c\s*=\s*"(([zh])([0-9a-fA-F]{4,4}))"\s*/>'
     GAIJI_REGEX = re.compile(_GAIJI_REGEX)
     GAIJI_WIDTHS = {EB_HOOK_NARROW_FONT: 'h', EB_HOOK_WIDE_FONT: 'z'}
+    GAIJI_WIDTHS_ = dict((v, k) for k, v in GAIJI_WIDTHS.items())
+    GAIJI_IMG_TEMPLATE = u'<img src="data:image/gif;base64,{base64_data}" style="position:relative;top:{top_padding}px"/>'
+    
 
     def __init__(self, parent):
         '''`parent` should be an EpwingBook instance.
@@ -23,11 +27,17 @@ class GaijiHandler(object):
         '''
         return self.GAIJI_TEMPLATE.format(width=self.GAIJI_WIDTHS[width_code], index=index)
 
+    def _embedded_gif_tag(self, gif_data, font_size):
+        base64_data = b64encode(gif_data)
+        padding = font_size / 8 
+        return self.GAIJI_IMG_TEMPLATE.format(base64_data=base64_data, top_padding=padding)
+
     def _replace_gaiji(self, match):
-        width = match.group(2)
-        code = match.group(3)
-        #return gaiji.get(widths[width], EB_HOOK_NARROW_FONT).get(int(code, 16), u'?')
-        return '$'
+        width = self.GAIJI_WIDTHS_[match.group(2)]
+        index = int(match.group(3), 16)
+        font_size = self.font_sizes[0]
+        gif_data = self.gif(width, index, font_size)
+        return self._embedded_gif_tag(gif_data, font_size)
 
     def replace_gaiji(self, html):
         '''Replaces any <gaiji> tags in `html` with the proper <img> tags.
@@ -53,8 +63,8 @@ class GaijiHandler(object):
         `width_code` is the `code` parameter of the hook that specifies font width
         `font_size` is either 'small' or 'large'
         '''
-        #TODO error handling
-        book = parent.book
+        #TODO error handling, invalid font size correction/availability property
+        book = self.parent.book
         font_size2 = self._font_sizes[font_size]
         #fontsize = (size == kFontImageSizeLarge) ? _largeFontType : _smallFontType;
   

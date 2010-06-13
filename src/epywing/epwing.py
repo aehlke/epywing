@@ -33,7 +33,6 @@ class Container(object):
         self.reference_stack = []
         self.decoration_stack = None
         self.buffer = u''
-        pass
 
 class Entry(object):
     '''Represents an entry in an EPWING dictionary.
@@ -59,12 +58,12 @@ class Entry(object):
             #return (None, None, ) #TODO error handling
         #text = self._get_content(subbook_id, text_location, container, eb_read_text)
         #return (heading, text, )
-        #print self.text
 
     @property
     def heading(self):
         heading = self.parent._get_content(self.subbook, self._heading_location, None, eb_read_heading)
-        return util.strip_tags(heading)
+        return heading
+        #return util.strip_tags(heading)
 
     @property
     def text(self):
@@ -401,7 +400,7 @@ class EpwingBook(object):
         def narrow_font():
             #self.hook_narrow_font(container, argv[0])
             return ''
-            return "<gaiji=h%04x>" % code
+            #return "<gaiji=h%04x>" % code
             #print code
             try:
                 text = eb_narrow_alt_character_text(self.appendix, code)
