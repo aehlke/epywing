@@ -78,9 +78,9 @@ class Entry(object):
     @property
     def id(self):
         if self.heading_location:
-            return _position_to_resource_id([*self.heading_location, *self.text_location])
+            return _position_to_resource_id(list(self.heading_location) + list(self.text_location))
         else:
-            return _position_to_resource_id([*self.text_location])
+            return _position_to_resource_id(list(self.text_location))
 
     @property
     def uri(self):
@@ -271,7 +271,19 @@ class EpwingBook(object):
         #data = string.replace(data, u'⇔→', u'⇔')
         if content_method != eb_read_heading:
             data = self._fix_html_hacks(data)
+            data = self._fix_anchor_links(data)
         return data
+    
+    def _fix_anchor_links(self, text):
+        '''If a reference links to a position within the entries already loaded,
+        then its link will be rewritten to point to the named anchor.
+        '''
+        doc = html.fromstring(text)
+        anchor_names = [anchor.attrib['name'] for anchor in doc.cssselect('a[name]')]
+        for reference in doc.cssselect('a[href]'):
+            if reference.attrib['href'] in anchor_names:
+                reference.attrib['href'] = '#' + reference.attrib['href']
+        return html.tostring(doc)
 
     def _fix_html_hacks(self, text):
         text = u'<div>{0}</div>'.format(text)
@@ -394,17 +406,6 @@ class EpwingBook(object):
             self._write_text_anchor(book, eb_tell_text(book))
             return '<span class="keyword">'
 
-        #def narrow_font():
-            ##self.hook_narrow_font(container, argv[0])
-            #return ''
-            ##return "<gaiji=h%04x>" % code
-            ##print code
-            #try:
-                #text = eb_narrow_alt_character_text(self.appendix, code)
-            #except EBError:
-                #text = '?'
-            #return text
-
         def begin_decoration():
             # argv[1] contains the method
             # 1: italic
@@ -426,10 +427,8 @@ class EpwingBook(object):
         hooks = { EB_HOOK_BEGIN_REFERENCE:    '<a>',
                   EB_HOOK_END_REFERENCE:      end_reference,
                   EB_HOOK_BEGIN_KEYWORD:      begin_keyword,
-                  EB_HOOK_BEGIN_NARROW:       None,#narrow_font,
-                  EB_HOOK_END_NARROW:         None,
-                  EB_HOOK_BEGIN_NO_NEWLINE:   None,
-                  EB_HOOK_END_NO_NEWLINE:     None,
+                  EB_HOOK_BEGIN_NO_NEWLINE:   '<span style="white-space: nowrap;">',#None,
+                  EB_HOOK_END_NO_NEWLINE:     '</span>',#None,
                   EB_HOOK_END_KEYWORD:        '</a></span>',
                   EB_HOOK_BEGIN_SUBSCRIPT:    '<sub>',
                   EB_HOOK_END_SUBSCRIPT:      '</sub>',
