@@ -14,7 +14,7 @@ class GaijiHandler(object):
     GAIJI_REGEX = re.compile(_GAIJI_REGEX)
     GAIJI_WIDTHS = {EB_HOOK_NARROW_FONT: 'h', EB_HOOK_WIDE_FONT: 'z'}
     GAIJI_WIDTHS_ = dict((v, k) for k, v in GAIJI_WIDTHS.items())
-    GAIJI_IMG_TEMPLATE = u'<img src="data:image/gif;base64,{base64_data}" style="position:relative;top:{top_padding}px"/>'
+    GAIJI_IMG_TEMPLATE = u'<img src="data:image/gif;base64,{base64_data}" style="position:relative;top:{top_padding}px;margin-left:2px;"/>'
     
 
     def __init__(self, parent):

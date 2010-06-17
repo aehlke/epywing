@@ -34,6 +34,8 @@ class Entry(object):
         '''`parent` is an EpwingBook instance.
         #`entry_locations` is a 2- or 4-tuple containing the entry's heading and text offsets.
         '''
+        self._heading = None
+        self._text = None
         self.parent = parent
         self.subbook = int(subbook_id)
         self._heading_location = heading_location
@@ -67,13 +69,17 @@ class Entry(object):
         just the text location, so an Entry instance doesn't always have a heading property.
         '''
         if self._heading_location:
-            return self.parent._get_content(self.subbook, self._heading_location, None, eb_read_heading)
+            if not self._heading:
+                self._heading = self.parent._get_content(self.subbook, self._heading_location, None, eb_read_heading)
+            return self._heading
         else:
             return None
 
     @property
     def text(self):
-        return self.parent._get_content(self.subbook, self._text_location, None, eb_read_text)
+        if not self._text:
+            self._text = self.parent._get_content(self.subbook, self._text_location, None, eb_read_text)
+        return self._text
 
     @property
     def id(self):
@@ -90,7 +96,7 @@ class Entry(object):
 
 class Container(object):
     # this is used for an unfortunate hack
-    EARLY_ENTRY_TERMINATOR = '__EARLY_ENTRY_TERMINATOR__'
+    EARLY_ENTRY_TERMINATOR = '__MANABI_EARLY_ENTRY_TERMINATOR__'
     def __init__(self, debug_mode=False):
         self.debug_mode = debug_mode
         self.reference_stack = []
@@ -113,7 +119,6 @@ class EpwingBook(object):
         self.name = path.basename(self.book_path)
         self.uri_dispatcher = EpwingUriDispatcher(self)
         self.book, self.appendix, self.hookset = EB_Book(), EB_Appendix(), EB_Hookset()
-        self._set_hooks()
 
         try:
             eb_bind(self.book, self.book_path.encode('utf-8'))
@@ -121,7 +126,7 @@ class EpwingBook(object):
             code = eb_error_string(error)
             raise Exception('Error: %s: %s\n' % (code, message))
 
-    #def __enter__(self):
+    #def __enter__(self):_html_escape_left
     #    eb_initialize_library()
     #    return self
     
@@ -220,6 +225,7 @@ class EpwingBook(object):
 
         # setup container
         container = Container()#debug_mode=True)
+        self._set_hooks(content_method)
 
         self._buffer_entry_count = 0
         self._buffer_start_position = position
@@ -242,6 +248,7 @@ class EpwingBook(object):
             if container.debug_mode:
                 data += '[--eor--]'
 
+
             i = data.find(container.EARLY_ENTRY_TERMINATOR)
             if i != -1:
                 if not container.debug_mode:
@@ -258,6 +265,11 @@ class EpwingBook(object):
                 break
 
         data = unicode(data, 'euc-jp', errors='ignore')
+
+        # handle HTML escaping, since we add HTML tags, but entries may contain < and > characters
+        data = data.replace('<', '&lt;')
+        data = data.replace('>', '&gt;')
+        data = self._unescape_html(data)
 
         data = self.gaiji_handler.replace_gaiji(data)
 
@@ -323,34 +335,52 @@ class EpwingBook(object):
         doc = html.tostring(doc)[5:]
         doc = doc[:-6]
         return doc
+    
+    _html_escape_left = '__MANABI_HTML_ESCAPE_LEFT__'
+    _html_escape_right = '__MANABI_HTML_ESCAPE_RIGHT__'
+    def _escape_html(self, text):
+        text = text.replace('<', self._html_escape_left)
+        text = text.replace('>', self._html_escape_right)
+        return text
 
-    def _set_hooks(self):
-        eb_set_hooks(self.hookset, (
+    def _unescape_html(self, text):
+        text = text.replace(self._html_escape_left, '<')
+        text = text.replace(self._html_escape_right, '>')
+        return text
+
+    def _write_text(self, text, escape_html=True):
+        # escape any HTML tags that we are inserting, since sometimes dictionary entries use < and > signs
+        # we will unescape these later
+        if escape_html:
+            text = self._escape_html(text)
+        eb_write_text_string(self.book, unicode(text).encode('euc-jp'))
+
+    def _set_hooks(self, content_method):
+        heading_hooks = [
             (EB_HOOK_INITIALIZE,          self._hook_initialize),
-            (EB_HOOK_NEWLINE,             self._hook_new_line),
-            #(EB_HOOK_NULL,                self._hook_null),
-            #(EB_HOOK_STOP_CODE,           self._handle_stop_code),
-            (EB_HOOK_SET_INDENT,          self._hook_set_indent),
-            (EB_HOOK_BEGIN_REFERENCE,     self._hook_tags),
-            (EB_HOOK_END_REFERENCE,       self._hook_tags),
-            (EB_HOOK_BEGIN_KEYWORD,       self._hook_tags),
-            (EB_HOOK_END_KEYWORD,         self._hook_tags),
             (EB_HOOK_BEGIN_SUBSCRIPT,     self._hook_tags),
             (EB_HOOK_END_SUBSCRIPT,       self._hook_tags),
             (EB_HOOK_BEGIN_SUPERSCRIPT,   self._hook_tags),
             (EB_HOOK_END_SUPERSCRIPT,     self._hook_tags),
-            #(EB_HOOK_BEGIN_NARROW,        self._hook_tags),
-            #(EB_HOOK_END_NARROW,          self._hook_tags),
-            (EB_HOOK_BEGIN_NO_NEWLINE,    self._hook_tags),
-            (EB_HOOK_END_NO_NEWLINE,      self._hook_tags),
             (EB_HOOK_BEGIN_EMPHASIS,      self._hook_tags),
             (EB_HOOK_END_EMPHASIS,        self._hook_tags),
-            #(EB_HOOK_BEGIN_WIDE,         self._hook_tags),
             (EB_HOOK_NARROW_FONT,         self._hook_font),
             (EB_HOOK_WIDE_FONT,           self._hook_font),
             (EB_HOOK_BEGIN_DECORATION,    self._hook_tags),
             (EB_HOOK_END_DECORATION,      self._hook_tags),
-        ))
+        ]
+        text_hooks = heading_hooks + [
+            (EB_HOOK_NEWLINE,             self._hook_new_line),
+            (EB_HOOK_SET_INDENT,          self._hook_set_indent),
+            (EB_HOOK_BEGIN_KEYWORD,       self._hook_tags),
+            (EB_HOOK_END_KEYWORD,         self._hook_tags),
+            (EB_HOOK_BEGIN_REFERENCE,     self._hook_tags),
+            (EB_HOOK_END_REFERENCE,       self._hook_tags),
+            #(EB_HOOK_BEGIN_NARROW,        self._hook_tags),
+            #(EB_HOOK_END_NARROW,          self._hook_tags),
+        ]
+        hooks = {eb_read_heading: heading_hooks, eb_read_text: text_hooks}
+        eb_set_hooks(self.hookset, tuple(hooks[content_method]))
 
     def _hook_initialize(self, book, appendix, container, code, argv):
         return EB_SUCCESS
@@ -359,25 +389,27 @@ class EpwingBook(object):
         subbook_id = str(eb_subbook(self.book))
         entry_id = _position_to_resource_id(position)
         uri = self.uri_dispatcher.uri('entry', subbook=subbook_id, entry=entry_id)
-        eb_write_text_string(book, unicode('<a name=\"{0}\">'.format(uri)).encode('euc-jp'))
+        self._write_text(u'<a name=\"{0}\">'.format(uri))
 
     #hooks
     #FIXME 'horsey' in chujiten is messed up, see ebview for correct one
     def _hook_new_line(self, book, appendix, container, code, argv):
-        eb_write_text_string(book, '<br/>\n')
+        self._write_text('<br/>\n')
         return EB_SUCCESS
 
     def _hook_set_indent(self, book, appendix, container, code, argv):
         if container.debug_mode:
-            eb_write_text_string(book, '[{0:x},{1}-i]'.format(argv[0],argv[1]))
-            eb_write_text_string(book, '{'+str(eb_tell_text(book))+'}')
+            self._write_text('[{0:x},{1}-i]'.format(argv[0],argv[1]))
+            self._write_text('{'+str(eb_tell_text(book))+'}')
+            self._write_text('['+str(container.indent_stop_code_count)+']')
 
         # we often have to use indent levels to determine where the entry properly ends,
         # since it is usually not clearly encoded.
         if not container.first_indent_level:
             container.first_indent_level = argv[1]
-        elif argv[1] < container.first_indent_level:
-            eb_write_text_string(book, container.EARLY_ENTRY_TERMINATOR)
+
+        if argv[1] < container.first_indent_level:
+            self._write_text(container.EARLY_ENTRY_TERMINATOR)
         elif argv[1] == 1:
             # first indent level is considered a stop code,
             # since it only occurs at the beginning of an entry.
@@ -385,10 +417,10 @@ class EpwingBook(object):
             
             if container.read_count >= 1 or container.indent_stop_code_count > 1:
                 # an unfortunate hack, since sometimes the next entry begins midway through a read
-                eb_write_text_string(book, container.EARLY_ENTRY_TERMINATOR)
+                self._write_text(container.EARLY_ENTRY_TERMINATOR)
 
         padding_width = 10 * int(argv[1]) #TODO refactor indentation padding constant
-        eb_write_text_string(book, '<hack_indent style=\"padding-left:{0}\"/>'.format(padding_width))
+        self._write_text('<hack_indent style=\"padding-left:{0}\"/>'.format(padding_width))
         return EB_SUCCESS
 
     #TODO set_indent hook
@@ -402,7 +434,7 @@ class EpwingBook(object):
 
         def begin_keyword():
             if container.debug_mode:
-                eb_write_text_string(book, '[{0:x},{1}]'.format(argv[0],argv[1]))
+                self._write_text('[{0:x},{1}]'.format(argv[0],argv[1]))
             self._write_text_anchor(book, eb_tell_text(book))
             return '<span class="keyword">'
 
@@ -444,13 +476,12 @@ class EpwingBook(object):
         if callable(text):
             text = text()
         if text is not None:
-            eb_write_text_string(book, text)
-        #eb_write_text_string(self.book,'k'+str(self.book.text_status())+str(self.book.auto_stop_code))
+            self._write_text(text)
         return EB_SUCCESS
 
     def _hook_wave(self, book, appendix, container, code, argv):
         if code == EB_HOOK_BEGIN_WAVE:
-            eb_write_text_string(self.book, '<a>')
+            self._write_text('<a>')
         elif code == EB_HOOK_END_WAVE:
             start_offset = (argv[2] - 1) * EB_SIZE_PAGE + argv[3]
             end_offset = (argv[4] - 1) * EB_SIZE_PAGE + argv[5]
@@ -461,13 +492,13 @@ class EpwingBook(object):
             offset = int(argv[3])
             audio_id = _position_to_resource_id([page, offset, data_size])
             uri = self.uri_dispatcher.uri('audio', subbook=subbook_id, audio=audio_id)
-            eb_write_text_string(self.book, '</a><hack_attribs href=\"{0}\" />'.format(uri))
+            self._write_text('</a><hack_attribs href=\"{0}\" />'.format(uri))
 
     #TODO refactor hook code into its own module
     #TODO use eb_narrow_font_character_bitmap for unknown ones, using a img tag whose url has the gaiji id
     def _hook_font(self, book, appendix, container, code, argv):
         # we'll convert the gaiji afterwards, since euc-jp doesn't have everything we need
-        eb_write_text_string(book, self.gaiji_handler.tag(code, argv[0]).encode('euc-jp'))
+        self._write_text(self.gaiji_handler.tag(code, argv[0]))
         return EB_SUCCESS
 
 
