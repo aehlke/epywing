@@ -47,7 +47,7 @@ class HistoryManager(object):
             raise IndexError
         self._forward.appendleft(self._back.pop())
         return self.current_location
-    
+
     def forward(self):
         '''Returns URI
         '''
