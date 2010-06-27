@@ -30,12 +30,34 @@ class HistoryManager(object):
 
     @current_location.setter
     def current_location(self, value):
-        return self.push(value)
+        print 'current_location:',
+        if value:
+            print value['entry'].heading
+        else:
+            print ''
+        '''Setting this doesn't push a new history item
+        (unless there is none, then it pushes it but you can still overwrite 
+        it by setting again).'''
+        if self._back:
+            self._back.pop()
+        #self.push(value)
+        self._back.append(value)
 
-    def push(self, uri):
+    def push(self, uri=None):
         '''Call this when visiting a new page, with the new page's URI.
+        If `uri` is None, then it will push the current location back, and set the 
+        new current location to None.
         '''
-        self._back.append(uri)
+        print 'push:',
+        if uri:
+            print uri['entry'].heading
+        else:
+            print ''
+        if uri:
+            self._back.append(uri)
+        else:
+            if self.current_location:
+                self._back.append(None)
         self._forward.clear()
 
     def back(self):
@@ -57,7 +79,7 @@ class HistoryManager(object):
         return self.current_location
 
     def go(self, index):
-        '''`index` moves history forward if positive, or back is negative.
+        '''`index` moves history forward if positive, or back if negative.
         '''
         if index < 0:
             go_func = self.back
@@ -80,4 +102,7 @@ class HistoryManager(object):
         
     def __len__(self):
         return len(self.back_items) + len(self.forward_items)
+
+    #def __repr__(self) :
+        #return u','.join(self.back_items) + u',[{0}],'.format(str(self.current_location)) + u','.join(self.forward_items)
 

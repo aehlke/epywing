@@ -36,6 +36,12 @@ class TestHistoryManager(unittest.TestCase):
         self.hist.go(-2)
         self.assertRaises(IndexError, self.hist.go, 10)
 
+    def test_current_location(self):
+        h = self.hist
+        #h.
+        pass
+
+
 
 class TestHistoryManager2(unittest.TestCase):
     def setUp(self):
