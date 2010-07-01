@@ -29,10 +29,11 @@ class Entry(object):
         '''`parent` is an EpwingBook instance.
         #`entry_locations` is a 2- or 4-tuple containing the entry's heading and text offsets.
         '''
-        self._heading = None
-        self._text = None
         self.parent = parent
         self.subbook = int(subbook)
+
+        self._heading = None
+        self._text = None
         self._heading_location = heading_location
         self._text_location = text_location
 
@@ -239,7 +240,7 @@ class EpwingBook(object):
                 yield entry
 
     #TODO separate the heading method
-    def _get_content(self, subbook, position, container, content_method, packed=False, entry_count=1):
+    def _get_content(self, subbook, position, container, content_method):
         eb_set_subbook(self.book, int(subbook))
 
         # setup container
