@@ -15,22 +15,38 @@ class BookManager(object):
     def __init__(self):
         self.books = {}
 
-    def add_books(self, *paths):
+    #def add_books(self, add_each_subbook=True, *paths):
+    def add_books(self, *paths, **kwargs):
         '''`paths` is a list of paths to books to add.
         Returns a dictionary that is a subset of `self.books`, containing only the newly added ones.
+        `add_each_subbook` makes an EpwingBook isntance for each individual subbook of each book (of which there
+        are 1 or more per book). If False, each EpwingBook will represent all the subbooks of each book.
         '''
         new_books = {}
+        add_each_subbook = kwargs.get('add_each_subbook', True)
+
+        def add_book(book):
+            key = book.id
+            if not self.books.has_key(key):
+                new_books[key] = self.books[key] = book
+
         for book_path in paths:
             try:
                 book = EpwingBook(book_path)
             except Exception as e:
+                print e
                 # some kind of binding error, so don't import this book - just ignore it, and don't include it in the return value
                 #TODO have a better custom exception or something for this so we don't catch all Exceptions
                 continue
-            #skip this dictionary if this folder name already exists in loaded books - the danger here is that it might not always skip the same book
-            key = book.id
-            if not self.books.has_key(key):
-                new_books[key] = self.books[key] = book
+
+            # skip this dictionary if this folder name already exists in loaded books.
+            # the danger here is that it might not always skip the same book.
+            if add_each_subbook:
+                for subbook in book.subbooks:
+                    subbook2 = EpwingBook(book_path, subbook=subbook['id'])
+                    add_book(subbook2)
+            else:
+                add_book(book)
         return new_books
 
     def remove_book(self, book_id):

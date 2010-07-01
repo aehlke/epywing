@@ -91,11 +91,15 @@ class HistoryManager(object):
 
     @property
     def back_items(self):
-        return list(self._back)[:-1] # remove the current location
+        return list(reversed(list(self._back)[:-1])) # remove the current location
     
     @property
     def forward_items(self):
         return list(self._forward)
+
+    @forward_items.setter
+    def forward_items(self, value):
+        self._forward = deque(value)
 
     def __contains__(self, val):
         return val in self._back or val in self._forward

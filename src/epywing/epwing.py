@@ -1,8 +1,4 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
-
-#EB API reference http://www.sra.co.jp/people/m-kasahr/eb/doc/eb-09.html
 
 from eb import *
 import sys
@@ -22,28 +18,23 @@ import struct
 
 #TODO refactor hooks - DRY
 
-
-#def hooks()
+#EB API reference http://www.sra.co.jp/people/m-kasahr/eb/doc/eb-09.html
 
 
 class Entry(object):
     '''Represents an entry in an EPWING dictionary.
     '''
 
-    def __init__(self, parent, subbook_id, heading_location, text_location):
+    def __init__(self, parent, subbook, heading_location, text_location):
         '''`parent` is an EpwingBook instance.
         #`entry_locations` is a 2- or 4-tuple containing the entry's heading and text offsets.
         '''
         self._heading = None
         self._text = None
         self.parent = parent
-        self.subbook = int(subbook_id)
+        self.subbook = int(subbook)
         self._heading_location = heading_location
         self._text_location = text_location
-
-        #if heading_location:
-        #self.heading = lambda: self._heading()
-        #self.heading = property(self.heading, lambda: self._heading()).getter()
 
     @classmethod
     def from_encoded_location(cls, parent, subbook_id, encoded_location):
@@ -75,6 +66,12 @@ class Entry(object):
         else:
             return None
 
+    def _heading_from_text(self):
+        '''Tries to get a heading from the text of the entry.
+        '''
+        pass
+
+
     @property
     def text(self):
         if not self._text:
@@ -90,13 +87,15 @@ class Entry(object):
 
     @property
     def uri(self):
-        return self.parent.uri_dispatcher.uri('entry', subbook=self.subbook_id, entry=entry_id)
+        return self.parent.uri_dispatcher.uri('entry', subbook=self.subbook, entry=self.id)
          
 
 
 class Container(object):
+
     # this is used for an unfortunate hack
     EARLY_ENTRY_TERMINATOR = '__MANABI_EARLY_ENTRY_TERMINATOR__'
+
     def __init__(self, debug_mode=False):
         self.debug_mode = debug_mode
         self.reference_stack = []
@@ -107,16 +106,26 @@ class Container(object):
         self.indent_stop_code_in_first_read = False
         self.buffer = u''
 
+
 class EpwingBook(object):
 
-    def __init__(self, book_path, gaiji_handler=None):
+    def __init__(self, book_path, subbook=None, gaiji_handler=None):
         '''`gaiji_handler` is a handler class, not an instance.
+        `subbook` is the index of the subbook within this EPWING book that this EpwingBook instance will represent.
+        If it is None, then it will default to representing all available subbooks, instead of a single one.
         '''
         self.book_path = book_path #TODO verify path is valid
+
+        self.subbook = subbook
+        print subbook
+
         self.gaiji_handler = gaiji_handler(self) if gaiji_handler else GaijiHandler(self)
 
-        self.id = urlsafe_b64_encode(path.basename(self.book_path))
-        self.name = path.basename(self.book_path)
+        self.id = path.basename(self.book_path)
+        if subbook is not None:
+            self.id += ':{0}'.format(subbook)
+        self.id = urlsafe_b64_encode(self.id)
+
         self.uri_dispatcher = EpwingUriDispatcher(self)
         self.book, self.appendix, self.hookset = EB_Book(), EB_Appendix(), EB_Hookset()
 
@@ -125,6 +134,11 @@ class EpwingBook(object):
         except EBError, (error, message):
             code = eb_error_string(error)
             raise Exception('Error: %s: %s\n' % (code, message))
+
+        if self.subbook is None:
+            self.name = path.basename(self.book_path)
+        else:
+            self.name = eb_subbook_title2(self.book, int(self.subbook)).decode('euc-jp')
 
     #def __enter__(self):_html_escape_left
     #    eb_initialize_library()
@@ -156,9 +170,9 @@ class EpwingBook(object):
 
     @property
     def subbooks(self):
-    #TODO def subbooks(cls, book, URI_prefix=''):
         '''Returns a list of the subbooks, with their name, URI and directory, for the current book
         '''
+        #TODO make this into a property only if self.subbook is None
         ret = []
         for subbook in eb_subbook_list(self.book):
             id = str(subbook)
@@ -196,18 +210,23 @@ class EpwingBook(object):
             wave_data = wave_data[:12] + wave_data[44:]
         return wave_data
 
-    def search(self, query, subbook_id=None, search_method='exact', search_options=None):
+    def search(self, query, subbook=None, search_method='exact', search_options=None):
+        '''Searches this book and yields matching entries.
+        Only set `subbook` if `self.subbook` is None.
+        '''
         #TODO what's container?
         if not query:
             return
-        if not subbook_id:
+        if not self.subbook and not subbook:
             #search all subbooks of this book
             for subbook in self.subbooks:
-                for result in self.search(query, subbook['id'], search_method=search_method, search_options=search_options):
+                for result in self.search(query, subbook=subbook['id'], search_method=search_method, search_options=search_options):
                     yield result
             return
+        else:
+            subbook = int(self.subbook)
 
-        eb_set_subbook(self.book, int(subbook_id))
+        eb_set_subbook(self.book, subbook)
         query_encoded = query.encode('euc-jp')
         self._search_methods[search_method](self.book, query_encoded)
 
@@ -216,7 +235,7 @@ class EpwingBook(object):
             if not hits:
                 break
             for heading_location, text_location in hits:
-                entry = Entry(self, subbook_id, heading_location, text_location)
+                entry = Entry(self, subbook, heading_location, text_location)
                 yield entry
 
     #TODO separate the heading method
@@ -338,6 +357,7 @@ class EpwingBook(object):
     
     _html_escape_left = '__MANABI_HTML_ESCAPE_LEFT__'
     _html_escape_right = '__MANABI_HTML_ESCAPE_RIGHT__'
+
     def _escape_html(self, text):
         text = text.replace('<', self._html_escape_left)
         text = text.replace('>', self._html_escape_right)
@@ -459,8 +479,8 @@ class EpwingBook(object):
         hooks = { EB_HOOK_BEGIN_REFERENCE:    '<a>',
                   EB_HOOK_END_REFERENCE:      end_reference,
                   EB_HOOK_BEGIN_KEYWORD:      begin_keyword,
-                  EB_HOOK_BEGIN_NO_NEWLINE:   '<span style="white-space: nowrap;">',#None,
-                  EB_HOOK_END_NO_NEWLINE:     '</span>',#None,
+                  EB_HOOK_BEGIN_NO_NEWLINE:   '<span style="white-space: nowrap;">',
+                  EB_HOOK_END_NO_NEWLINE:     '</span>',
                   EB_HOOK_END_KEYWORD:        '</a></span>',
                   EB_HOOK_BEGIN_SUBSCRIPT:    '<sub>',
                   EB_HOOK_END_SUBSCRIPT:      '</sub>',
