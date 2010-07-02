@@ -1,4 +1,6 @@
-from plugin import PluginMount
+# -*- coding: utf-8 -*-
+#
+from utils.plugin import PluginMount
 from epywing.categories import JapaneseEnglish, EnglishJapanese
 
 
@@ -21,7 +23,7 @@ class BookTitle(object):
         '''
         for title_class in cls.plugins:
             title = title_class(book)
-            if title.matches(book):
+            if title.matches():
                 return title
 
 

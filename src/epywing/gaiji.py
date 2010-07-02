@@ -3,6 +3,7 @@
 from eb import *
 import re
 from base64 import b64encode
+from bookfilter import BookFilter
 
 class GaijiHandler(object):
     '''Basic gaiji handler that returns gaiji PNG data embedded in <img> tags.
@@ -22,6 +23,7 @@ class GaijiHandler(object):
         '''
         self.parent = parent
 
+    @BookFilter.filter_gaiji_tag
     def tag(self, width_code, index):
         '''Returns a <gaiji> tag.
         '''
@@ -38,6 +40,7 @@ class GaijiHandler(object):
         font_size = self.font_sizes[0]
         gif_data = self.gif(width, index, font_size)
         return self._embedded_gif_tag(gif_data, font_size)
+
 
     def replace_gaiji(self, html):
         '''Replaces any <gaiji> tags in `html` with the proper <img> tags.

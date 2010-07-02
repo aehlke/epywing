@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from epywing import BookFilter
+from epywing.bookfilter import BookFilter
 from epywing.titles import GeniusEiwaDaijiten
 
 
@@ -14,13 +14,14 @@ class GeniusEiwaDaijitenFilter(BookFilter):
     applies_to = [GeniusEiwaDaijiten]
 
     def filter_heading(self, heading):
-        replacements = {
-           u'·': u'',
-        }
+        if heading is not None:
+            replacements = {
+                u'·': u'',
+                u'・': u'',
+            }
 
-        for find, replace in replacements.items():
-            heading = heading.replace(find, replace)
-
+            for find, replace in replacements.items():
+                heading = heading.replace(find, replace)
         return heading
 
     def filter_text(self, text):
@@ -31,7 +32,8 @@ class GeniusEiwaDaijitenFilter(BookFilter):
         0xa127: u'》',
         0xa128: u'〔',
         0xa129: u'〕',
-        0xa12a: u'〜', #TODO span class= for any occurences
+        #0xa12a: u'〜', #TODO span class= for any occurences
+        #41262: u'e',
     }
 
     wide_gaiji = {

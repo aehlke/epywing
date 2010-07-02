@@ -58,7 +58,7 @@ class Entry(object):
         return cls(parent, subbook_id, heading_location, text_location)
 
     @property
-    @BookFilter.wrap_filter(BookFilter.filter_heading)
+    @BookFilter.wrap_filter('filter_heading')
     def heading(self):
         '''Sometimes we follow a reference link to an entry that doesn't include its heading,
         just the text location, so an Entry instance doesn't always have a heading property.
@@ -71,6 +71,7 @@ class Entry(object):
             return None
 
     @property
+    @BookFilter.wrap_filter('filter_text')
     def text(self):
         if not self._text:
             self._text = self.parent._get_content(self.subbook, self._text_location, None, eb_read_text)
