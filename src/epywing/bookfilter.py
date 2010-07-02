@@ -34,22 +34,28 @@ class BookFilter(object):
                 if title.__class__ in plugin_cls.applies_to]
 
     @classmethod
-    def filter_gaiji_tag(cls, func):
+    def filter_gaiji(cls, func):
         '''Decorator for filtering the gaiji tag generation method (`GaijiHandler.tag`).
         '''
         @wraps(func)
         def tag_decorator(self, width_code, index):
             book = self.parent
-            width = self.GAIJI_WIDTHS[width_code]
 
             for plugin_cls in cls.get_filters_for_title(book.title):
                 plugin = plugin_cls()
 
-                gaiji = {'h': plugin.narrow_gaiji, 'z': plugin.wide_gaiji}.get(width, None)
+                gaiji = {'h': plugin.narrow_gaiji, 'z': plugin.wide_gaiji}.get(width_code, None)
 
                 if gaiji and index in gaiji:
-                    print 'gaiji in!'
-                    return gaiji[index]
+                    replacement = gaiji[index]
+
+                    if isinstance(replacement, tuple):
+                        replacement = replacement[0]
+                    if replacement is None:
+                        continue
+                    else:
+                        return replacement
+
             return func(self, width_code, index)
         return tag_decorator
 

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 from utils.plugin import PluginMount
-from epywing.categories import JapaneseEnglish, EnglishJapanese
+from epywing.categories import JapaneseEnglish, EnglishJapanese, Japanese
 
 
 class BookTitle(object):
@@ -42,4 +42,10 @@ class GeniusEiwaDaijiten(BookTitle):
     def matches(self):
         return u'ジーニアス英和大辞典' in self.book.name
 
+
+class SanseidoSuperDaijirin(BookTitle):
+    categories = [Japanese]
+
+    def matches(self):
+        return u'三省堂　スーパー大辞林' in self.book.name
 

@@ -23,7 +23,6 @@ class GaijiHandler(object):
         '''
         self.parent = parent
 
-    @BookFilter.filter_gaiji_tag
     def tag(self, width_code, index):
         '''Returns a <gaiji> tag.
         '''
@@ -34,18 +33,24 @@ class GaijiHandler(object):
         padding = font_size / 8 
         return self.GAIJI_IMG_TEMPLATE.format(base64_data=base64_data, top_padding=padding)
 
-    def _replace_gaiji(self, match):
-        width = self.GAIJI_WIDTHS_[match.group(2)]
-        index = int(match.group(3), 16)
+    @BookFilter.filter_gaiji
+    def gaiji(self, width_code, index):
+        '''Returns an image tag with the image data embedded inline.
+        '''
+        width = self.GAIJI_WIDTHS_[width_code]
         font_size = self.font_sizes[0]
         gif_data = self.gif(width, index, font_size)
         return self._embedded_gif_tag(gif_data, font_size)
 
-
-    def replace_gaiji(self, html):
+    def replace_all_gaiji_tags(self, html):
         '''Replaces any <gaiji> tags in `html` with the proper <img> tags.
         '''
-        return self.GAIJI_REGEX.sub(self._replace_gaiji, html)
+        def _replace_gaiji_tag(match):
+            width_code = match.group(2)
+            index = int(match.group(3), 16)
+            return self.gaiji(width_code, index)
+
+        return self.GAIJI_REGEX.sub(_replace_gaiji_tag, html)
         #for match in pat.finditer(data):
         #eb_write_text_string(book, gaiji[code].get(argv[0], \
         #        #'<span title=\"{0:x}\">?</span>'\

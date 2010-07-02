@@ -292,7 +292,7 @@ class EpwingBook(object):
         data = data.replace('>', '&gt;')
         data = self._unescape_html(data)
 
-        data = self.gaiji_handler.replace_gaiji(data)
+        data = self.gaiji_handler.replace_all_gaiji_tags(data)
 
         #if content_method == eb_read_heading:
         #    print data

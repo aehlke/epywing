@@ -28,6 +28,7 @@ class GeniusEiwaDaijitenFilter(BookFilter):
         return text
 
     narrow_gaiji = {
+        41249: u'',
         0xa126: u'《',
         0xa127: u'》',
         0xa128: u'〔',
