@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from epywing.utils import BookFilter
+from epywing import BookFilter
 from epywing.titles import GeniusEiwaDaijiten
 
 
@@ -8,6 +8,7 @@ class GeniusFilter(BookFilter):
     '''Filter for all Genius dictionaries, since they share some formatting.
     '''
     applies_to = [GeniusEiwaDaijiten]
+
 
 class GeniusEiwaDaijitenFilter(BookFilter):
     applies_to = [GeniusEiwaDaijiten]

@@ -15,6 +15,8 @@ from uris import EpwingUriDispatcher
 from gaiji import gaiji, GaijiHandler
 import util
 import struct
+from bookfilter import BookFilter
+from titles import BookTitle
 
 #TODO refactor hooks - DRY
 
@@ -56,6 +58,7 @@ class Entry(object):
         return cls(parent, subbook_id, heading_location, text_location)
 
     @property
+    @BookFilter.wrap_filter(BookFilter.filter_heading)
     def heading(self):
         '''Sometimes we follow a reference link to an entry that doesn't include its heading,
         just the text location, so an Entry instance doesn't always have a heading property.
@@ -66,12 +69,6 @@ class Entry(object):
             return self._heading
         else:
             return None
-
-    def _heading_from_text(self):
-        '''Tries to get a heading from the text of the entry.
-        '''
-        pass
-
 
     @property
     def text(self):
@@ -116,10 +113,7 @@ class EpwingBook(object):
         If it is None, then it will default to representing all available subbooks, instead of a single one.
         '''
         self.book_path = book_path #TODO verify path is valid
-
         self.subbook = subbook
-        print subbook
-
         self.gaiji_handler = gaiji_handler(self) if gaiji_handler else GaijiHandler(self)
 
         self.id = path.basename(self.book_path)
@@ -141,12 +135,18 @@ class EpwingBook(object):
         else:
             self.name = eb_subbook_title2(self.book, int(self.subbook)).decode('euc-jp')
 
+        # Get the corresponding BookTitle subclass instance
+        # (may be None if unknown)
+        self.title = BookTitle.get_title(self)
+
+
     #def __enter__(self):_html_escape_left
     #    eb_initialize_library()
     #    return self
     
     #def __exit__(self, type, value, traceback):
     #    eb_finalize_library()
+
 
     @property
     def _search_methods(self):
@@ -441,7 +441,7 @@ class EpwingBook(object):
                 self._write_text(container.EARLY_ENTRY_TERMINATOR)
 
         padding_width = 10 * int(argv[1]) #TODO refactor indentation padding constant
-        self._write_text('<hack_indent style=\"padding-left:{0}\"/>'.format(padding_width))
+        self._write_text(u'<hack_indent style=\"padding-left:{0}\"/>'.format(padding_width))
         return EB_SUCCESS
 
     #TODO set_indent hook
@@ -450,7 +450,7 @@ class EpwingBook(object):
             subbook_id = str(eb_subbook(self.book))
             entry_id = _position_to_resource_id([argv[1], argv[2]])
             uri = self.uri_dispatcher.uri('entry', subbook=subbook_id, entry=entry_id)
-            return '</a><hack_attribs href=\"{0}\" rel=\"subsection\"/>'.format(uri)
+            return u'</a><hack_attribs href=\"{0}\" rel=\"subsection\"/>'.format(uri)
             #TODO sometimes the rel will be an entry/keyword (chapter?), or book, etc.
 
         def begin_keyword():
@@ -513,7 +513,7 @@ class EpwingBook(object):
             offset = int(argv[3])
             audio_id = _position_to_resource_id([page, offset, data_size])
             uri = self.uri_dispatcher.uri('audio', subbook=subbook_id, audio=audio_id)
-            self._write_text('</a><hack_attribs href=\"{0}\" />'.format(uri))
+            self._write_text(u'</a><hack_attribs href=\"{0}\" />'.format(uri))
 
     #TODO refactor hook code into its own module
     #TODO use eb_narrow_font_character_bitmap for unknown ones, using a img tag whose url has the gaiji id

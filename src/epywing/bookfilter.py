@@ -1,3 +1,4 @@
+from functools import wraps
 from plugin import PluginMount
 
 class BookFilter(object):
@@ -21,3 +22,13 @@ class BookFilter(object):
         pass
 
 
+    @classmethod
+    def wrap_filter(cls, filter_func):
+        '''Decorator for filtering a function's return value.
+        '''
+        def factory(func):
+            @wraps(func)
+            def decorator(*args, **kwargs):
+                return filter_func(func(*args, **kwargs))
+            return decorator
+        return factory
