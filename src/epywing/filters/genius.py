@@ -1,14 +1,13 @@
 # -*- coding: utf-8 -*-
 
 from epywing.bookfilter import BookFilter
-from epywing.titles import GeniusEiwaDaijiten
+from epywing.titles import GeniusEiwaDaijiten, GeniusEiwaWaeiJiten
 
 
 class GeniusFilter(BookFilter):
     '''Filter for all Genius dictionaries, since they share some formatting.
     '''
     applies_to = [GeniusEiwaDaijiten]
-
 
 class GeniusEiwaDaijitenFilter(BookFilter):
     applies_to = [GeniusEiwaDaijiten]
@@ -402,6 +401,14 @@ class GeniusEiwaDaijitenFilter(BookFilter):
         #0xa33c: u'[一覧]',#u'§',
         #0xa34f: u'⇔',
     }
+
+
+class GeniusEiwaWaeiJitenFilter(BookFilter):
+    applies_to = [GeniusEiwaWaeiJiten]
+
+    narrow_gaiji = GeniusEiwaDaijitenFilter.narrow_gaiji
+    wide_gaiji = GeniusEiwaDaijitenFilter.wide_gaiji
+
 
 #class AllBooks(BookIdentity):
 #    @classmethod

@@ -5,7 +5,8 @@ from epywing.categories import JapaneseEnglish, EnglishJapanese, Japanese
 
 
 class BookTitle(object):
-
+    '''Base class for book titles.
+    '''
     __metaclass__ = PluginMount
 
     def __init__(self, book, *args, **kwargs):
@@ -28,10 +29,6 @@ class BookTitle(object):
 
 
 
-#class AllTitles(BookTitle):
-
-#    def matches(self, book):
-#        return True
 
 # EPWING book titles below
 
@@ -43,8 +40,15 @@ class GeniusEiwaDaijiten(BookTitle):
         return u'ジーニアス英和大辞典' in self.book.name
 
 
+class GeniusEiwaWaeiJiten(BookTitle):
+    categories = [JapaneseEnglish, EnglishJapanese]
+
+    def matches(self):
+        return u'ジーニアス英和・和英辞典' in self.book.name
+
+
 class SanseidoSuperDaijirin(BookTitle):
-    categories = [Japanese]
+    categories = [Japanese, EnglishJapanese]
 
     def matches(self):
         return u'三省堂　スーパー大辞林' in self.book.name
