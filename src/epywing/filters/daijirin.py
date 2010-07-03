@@ -10,8 +10,6 @@ class Daijirin(BookFilter):
     def filter_heading(self, heading):
         if heading is not None:
             replacements = {
-                u'·': u'',
-                u'・': u'',
             }
 
             for find, replace in replacements.items():
