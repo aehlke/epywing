@@ -6,6 +6,7 @@ from epwing import EpwingBook
 from itertools import islice
 from collections import defaultdict
 
+# these files will identify a directory as an EPWING book
 EPWING_IDENTIFYING_FILENAMES = ['CATALOGS', 'catalogs', 'CATALOG', 'catalog',]
 
 class BookManager(object):
@@ -15,7 +16,6 @@ class BookManager(object):
     def __init__(self):
         self.books = {}
 
-    #def add_books(self, add_each_subbook=True, *paths):
     def add_books(self, *paths, **kwargs):
         '''`paths` is a list of paths to books to add.
         Returns a dictionary that is a subset of `self.books`, containing only the newly added ones.
@@ -27,6 +27,7 @@ class BookManager(object):
 
         def add_book(book):
             key = book.id
+
             if not self.books.has_key(key):
                 new_books[key] = self.books[key] = book
 
@@ -47,6 +48,7 @@ class BookManager(object):
                     add_book(subbook2)
             else:
                 add_book(book)
+
         return new_books
 
     def remove_book(self, book_id):
@@ -64,57 +66,60 @@ class BookManager(object):
         for filename in EPWING_IDENTIFYING_FILENAMES:
             if path.exists(path.join(path_, filename)):
                 return True
+
         return False
 
     def find_books_in_path(self, path_, n_deep=2):
         '''Scans the given directory for EPWING books and returns a list of their paths.
         '''
         paths = []
-        #print n_deep
-        #if path.exists(path.join(path_, 
+
         if self.path_is_epwing_book(path_):
             return [path_]
+
         for item in glob(path.join(path_, '*')):
             if path.isdir(item) or path.islink(item):
                 if self.path_is_epwing_book(item):
                     paths.append(item)
                 elif n_deep:
                     paths.extend(self.find_books_in_path(item, n_deep=n_deep - 1))
+
         return paths
 
+    def _search_and_combine(self, query, books, max_results_per_book=25, **kwargs):
+        results = defaultdict(list)
 
-    def search_all(self, query, max_results_per_book=50, **kwargs):
-        '''See EpwingDictionary.search for documentation.
-        Adds a `book` key-value to each result with the book it came from.
-        '''
-        for book in self.books.values():
+        for book in books:
             for result in islice(book.search(query, **kwargs), 0, max_results_per_book):
-                #result['book'] = book
-                yield result
+                results[result.heading].append(result)
 
+        return results
 
-    #def search_all_combined(self, query, max_results_per_book=50, **kwargs):
-    #    '''Searches all books and combines their top 50 (by default) results.
-    #    Return a structure like:
-    #        [{'heading': 'test', 'results': test_results},]
-    #    where `test_results` is a list of search result dicts.
-    #    '''
-    #    # consume the iterator
-    #    results = list(self.search_all(query, max_results_per_book=max_results_per_book, **kwargs))
-    #    #print results
+    def search_all(self, query, max_results_per_book=25, **kwargs):
+        '''See EpwingDictionary.search for documentation.
+        Returns a dictionary of entry headings mapped to lists of entries which have that heading.
+        '''
+        return self._search_and_combine(query, self.books.values(), max_results_per_book=max_results_per_book, **kwargs)
+    
+    def search_category(self, category, query, max_results_per_book=25, **kwargs):
+        '''Returns a dictionary of entry headings mapped to lists of entries which have that heading.
+        '''
+        return self._search_and_combine(query, self.get_books_of_category(category), max_results_per_book=max_results_per_book, **kwargs)
 
-    #    # combine the results by `heading` key
-    #    combined_results = defaultdict(list)
-    #    for result in results:
-    #        result2 = result.copy()
-    #        #del result2['heading']
-    #        #combined_results[result['heading']].append(result2)
+    @property
+    def categories(self):
+        '''Returns a list of the categories of installed books.
+        Sorts by category name.
+        '''
+        categories = set()
 
+        for book in [b for b in self.books.values() if b.title]:
+            categories.update(book.title.categories)
 
-    #    # sort the combined results
-    #    sorted_results = [{'heading': key, 'results': val} 
-    #            for key, val in sorted(combined_results.items())]
-    #    return sorted_results
+        return sorted(list(categories), key=lambda e: e.label)
 
-
+    def get_books_of_category(self, category):
+        '''Returns a list of books for the given BookCategory.
+        '''
+        return [book for book in self.books.values() if book.title and category in book.title.categories]
 

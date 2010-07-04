@@ -7,7 +7,8 @@ from epywing.titles import GeniusEiwaDaijiten, GeniusEiwaWaeiJiten
 class GeniusFilter(BookFilter):
     '''Filter for all Genius dictionaries, since they share some formatting.
     '''
-    applies_to = [GeniusEiwaDaijiten]
+    applies_to = [GeniusEiwaDaijiten, GeniusEiwaWaeiJiten]
+
 
 class GeniusEiwaDaijitenFilter(BookFilter):
     applies_to = [GeniusEiwaDaijiten]
@@ -15,7 +16,7 @@ class GeniusEiwaDaijitenFilter(BookFilter):
     def filter_heading(self, heading):
         if heading is not None:
             replacements = {
-                u'·': u'',
+                #u'·': u'',
                 u'・': u'',
             }
 
@@ -405,6 +406,17 @@ class GeniusEiwaDaijitenFilter(BookFilter):
 
 class GeniusEiwaWaeiJitenFilter(BookFilter):
     applies_to = [GeniusEiwaWaeiJiten]
+
+    def filter_heading(self, heading):
+        if heading is not None:
+            replacements = {
+                u'·': u'',
+                u'・': u'',
+            }
+
+            for find, replace in replacements.items():
+                heading = heading.replace(find, replace)
+        return heading
 
     narrow_gaiji = GeniusEiwaDaijitenFilter.narrow_gaiji
     wide_gaiji = GeniusEiwaDaijitenFilter.wide_gaiji

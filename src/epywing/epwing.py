@@ -214,7 +214,8 @@ class EpwingBook(object):
 
     def search(self, query, subbook=None, search_method='exact', search_options=None):
         '''Searches this book and yields matching entries.
-        Only set `subbook` if `self.subbook` is None.
+        Only set `subbook` if `self.subbook` is None (though it is not necessary - all subbooks will be 
+        searched if both are None).
         '''
         #TODO what's container?
         if not query:

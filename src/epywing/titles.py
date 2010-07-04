@@ -26,8 +26,7 @@ class BookTitle(object):
             title = title_class(book)
             if title.matches():
                 return title
-
-
+        return None
 
 
 # EPWING book titles below
