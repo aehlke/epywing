@@ -32,7 +32,7 @@ class BookTitle(object):
 # EPWING book titles below
 
 class GeniusEiwaDaijiten(BookTitle):
-    #label = 'Genius EiWa Daijiten'
+    label = 'ジーニアス英和大辞典'
     categories = [JapaneseEnglish]
 
     def matches(self):
@@ -51,4 +51,34 @@ class SanseidoSuperDaijirin(BookTitle):
 
     def matches(self):
         return u'三省堂　スーパー大辞林' in self.book.name
+
+
+class Kojien6(BookTitle):
+    categories = [Japanese]
+
+    def matches(self):
+        return u'広辞苑第六版' in self.book.name
+
+
+class KenkyushaCollocations(BookTitle):
+    #categories = [EnglishJapanese]
+    #TODO what category is this, really?
+
+    def matches(self):
+        return u'研究社 新編英和活用大辞典' in self.book.name
+
+
+class KenkyushaShinEiwaDaijiten6(BookTitle):
+    categories = [EnglishJapanese]
+
+    def matches(self):
+        return u'研究社　新英和大辞典　第６版' in self.book.name
+
+
+class KenkyushaReadersPlus(BookTitle):
+    categories = [EnglishJapanese]
+
+    def matches(self):
+        return u'研究社　リーダーズ＋プラス' in self.book.name
+
 

@@ -131,13 +131,6 @@ class EpwingBook(object):
             code = eb_error_string(error)
             raise Exception('Error: %s: %s\n' % (code, message))
 
-        #print int(self.subbook)
-        #print int(self.subbook)
-        # make sure the book supports at least 1 search method
-        #print self.search_methods
-        #print eb_have_word_search(self.book)
-        #print eb_have_exactword_search(self.book)
-
         if self.subbook is None:
             self.name = path.basename(self.book_path)
         else:
@@ -196,10 +189,6 @@ class EpwingBook(object):
             })
         return ret
 
-    #def entry(self, entry_id, subbook_id, container=None):
-    #    '''Returns a 2-tuple containing the entry's header and its text contents.
-    #    '''
-
     #TODO
     #def entries(self, from_entry_id, subbook_id, container=None):
     #  pass #yield entries one by one
@@ -241,16 +230,22 @@ class EpwingBook(object):
             subbook = int(self.subbook)
 
         eb_set_subbook(self.book, subbook)
-        query_encoded = query.encode('euc-jp')
-        self._search_methods[search_method](self.book, query_encoded)
+        self._search_methods[search_method](self.book, query.encode('euc-jp'))
+
+        # Sometimes multiple headings in a search results hit list point
+        # to the same text location. We'll keep track of these text locations
+        # so that we don't add duplicate hits.
+        text_location_hits = []
 
         while True:
             hits = eb_hit_list(self.book)
             if not hits:
                 break
             for heading_location, text_location in hits:
-                entry = Entry(self, subbook, heading_location, text_location)
-                yield entry
+                if text_location not in text_location_hits:
+                    text_location_hits.append(text_location)
+                    entry = Entry(self, subbook, heading_location, text_location)
+                    yield entry
 
     #TODO separate the heading method
     def _get_content(self, subbook, position, container, content_method):
@@ -306,8 +301,6 @@ class EpwingBook(object):
 
         data = self.gaiji_handler.replace_all_gaiji_tags(data)
 
-        #if content_method == eb_read_heading:
-        #    print data
         #TODO refactor
         #data = string.replace(data, u'\x00', '') #remove null characters, which can break lxml's HTML parser
         #data = string.replace(data, u'→§', u'§') #''
@@ -558,23 +551,3 @@ if __name__ == "__main__":
         #print(u'{0}:\n{1}'.format(h, c))
     eb_finalize_library()
 
-#typedef struct _SContainer {
-#    id          clazz;
-#    id          string;
-#    NSMutableArray* styles;
-#    NSMutableArray* links;
-#    int         range;
-#    bool                gaiji;
-#    NSMutableData*  raw;
-#} SContainer;
-#buffer[sizeof(buffer) - 1] = '\0';
-#bufferString = [NSMutableString stringWithCapacity:64];
-#container.string = bufferString;
-#container.clazz = self;
-#container.styles = NULL;
-#container.gaiji = FALSE;
-#container.raw = NULL;
-#container.styles = None
-#container.gaiji = False
-#container.raw = None
-#contaianer.clazz = 
