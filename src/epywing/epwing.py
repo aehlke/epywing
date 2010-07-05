@@ -131,6 +131,13 @@ class EpwingBook(object):
             code = eb_error_string(error)
             raise Exception('Error: %s: %s\n' % (code, message))
 
+        #print int(self.subbook)
+        #print int(self.subbook)
+        # make sure the book supports at least 1 search method
+        #print self.search_methods
+        #print eb_have_word_search(self.book)
+        #print eb_have_exactword_search(self.book)
+
         if self.subbook is None:
             self.name = path.basename(self.book_path)
         else:
@@ -160,6 +167,10 @@ class EpwingBook(object):
                        'keyword': (eb_have_keyword_search, eb_search_keyword,),
                        #'multi': (eb_have_multi_search, eb_search_multi,),
         }
+
+        subbook = int(self.subbook) if self.subbook else 0
+        eb_set_subbook(self.book, subbook)
+
         return dict((key, val[1],) for key, val in all_methods.items() if val[0](self.book))
 
     @property
