@@ -3,7 +3,6 @@
 from epywing.bookfilter import BookFilter
 from epywing.titles import SanseidoSuperDaijirin
 
-
 class Daijirin(BookFilter):
     applies_to = [SanseidoSuperDaijirin]
 

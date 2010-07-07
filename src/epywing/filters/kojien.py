@@ -15,7 +15,7 @@ class Kojien6Filter(BookFilter):
             for find, replace in replacements.items():
                 heading = heading.replace(find, replace)
 
-        return heading
+        return heading.strip()
 
     def filter_text(self, text):
         return text

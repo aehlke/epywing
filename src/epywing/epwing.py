@@ -12,7 +12,7 @@ import re
 from mybase64 import urlsafe_b64_encode, urlsafe_b64_decode, _num_decode, _position_to_resource_id, _ENTRY_ID_SPLIT
 
 from uris import EpwingUriDispatcher
-from gaiji import gaiji, GaijiHandler
+from gaiji import GaijiHandler
 import util
 import struct
 from bookfilter import BookFilter
@@ -108,7 +108,7 @@ class Container(object):
 
 class EpwingBook(object):
 
-    def __init__(self, book_path, subbook=None, gaiji_handler=None):
+    def __init__(self, book_path, subbook=None, gaiji_handler=None, manager=None):
         '''`gaiji_handler` is a handler class, not an instance.
         `subbook` is the index of the subbook within this EPWING book that this EpwingBook instance will represent.
         If it is None, then it will default to representing all available subbooks, instead of a single one.
@@ -116,6 +116,8 @@ class EpwingBook(object):
         self.book_path = book_path #TODO verify path is valid
         self.subbook = subbook
         self.gaiji_handler = gaiji_handler(self) if gaiji_handler else GaijiHandler(self)
+
+        self.manager = manager
 
         self.id = path.basename(self.book_path)
         if subbook is not None:
@@ -230,7 +232,13 @@ class EpwingBook(object):
             subbook = int(self.subbook)
 
         eb_set_subbook(self.book, subbook)
-        self._search_methods[search_method](self.book, query.encode('euc-jp'))
+        encoded_query = query.encode('euc-jp')
+        if not encoded_query.strip():
+            return
+        try:
+            self._search_methods[search_method](self.book, encoded_query)
+        except EBError:
+            return
 
         # Sometimes multiple headings in a search results hit list point
         # to the same text location. We'll keep track of these text locations

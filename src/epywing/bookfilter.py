@@ -13,6 +13,9 @@ class BookFilter(object):
     narrow_gaiji = {}
     wide_gaiji = {}
 
+    def __init__(self, book, *args, **kwargs):
+        self.book = book
+
     def filter_heading(self, heading):
         '''
         Wraps `Entry.heading`
@@ -30,8 +33,12 @@ class BookFilter(object):
 
     @classmethod
     def get_filters_for_title(cls, title):
-        return [plugin_cls for plugin_cls in cls.plugins
-                if title.__class__ in plugin_cls.applies_to]
+        universal_filters = [plugin_cls for plugin_cls in cls.plugins
+                if not hasattr(plugin_cls, 'applies_to')]
+        specific_filters = [plugin_cls for plugin_cls in cls.plugins
+                if hasattr(plugin_cls, 'applies_to')
+                and title.__class__ in plugin_cls.applies_to]
+        return universal_filters + specific_filters
 
     @classmethod
     def filter_gaiji(cls, func):
@@ -42,7 +49,7 @@ class BookFilter(object):
             book = self.parent
 
             for plugin_cls in cls.get_filters_for_title(book.title):
-                plugin = plugin_cls()
+                plugin = plugin_cls(book)
 
                 gaiji = {'h': plugin.narrow_gaiji, 'z': plugin.wide_gaiji}.get(width_code, None)
 
@@ -63,6 +70,7 @@ class BookFilter(object):
     @classmethod
     def wrap_filter(cls, filter_name):
         '''Decorator for filtering a method's return value.
+        Passes on kwargs to filter function.
         '''
         def factory(func):
             @wraps(func)
@@ -76,8 +84,8 @@ class BookFilter(object):
                 # this book's title (if specified).
                 for plugin_cls in cls.get_filters_for_title(title):
                     if hasattr(plugin_cls, filter_name):
-                        plugin = plugin_cls()
-                        ret = getattr(plugin, filter_name)(ret)
+                        plugin = plugin_cls(book)
+                        ret = getattr(plugin, filter_name)(ret, **kwargs)
                 return ret
             return decorator
         return factory

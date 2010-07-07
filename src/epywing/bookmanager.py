@@ -48,7 +48,7 @@ class BookManager(object):
             # the danger here is that it might not always skip the same book.
             if add_each_subbook:
                 for subbook in book.subbooks:
-                    subbook2 = EpwingBook(book_path, subbook=subbook['id'])
+                    subbook2 = EpwingBook(book_path, subbook=subbook['id'], manager=self)
                     add_book(subbook2)
             else:
                 add_book(book)
