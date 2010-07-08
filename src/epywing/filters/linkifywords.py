@@ -25,7 +25,7 @@ class LinkifyWordsFilter(BookFilter):
     #link_template = u'<a href="url">{text}</a>'
     link_template = u'<span class="searchable-word" onclick="search(this);">{text}</span>'
 
-    # punctuation characters regex for unicode
+    # punctuation (and other non-word characters) regex for unicode
     _po_numbers = u'1234567890１２３４５６７８９０'
     _po_extra = u'〈〉（）()←↓↑→⇒⇔＜＞【】《》[]［］〔〕「」『』◇◆★‖｜＝━−‘-〜…=×+＋○°θ▽'
     _po_punc = u''.join(unichr(x) for x in xrange(65536) if unicodedata.category(unichr(x)) == 'Po')
@@ -52,7 +52,7 @@ class LinkifyWordsFilter(BookFilter):
             parent = fragment.getparent()
 
             # don't linkify if it's inside an anchor link tag
-            if parent.tag == 'a':
+            if fragment.is_text and parent.tag == 'a':
                 continue
 
             linkified = self.linkify(cgi.escape(fragment))
