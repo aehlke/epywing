@@ -115,6 +115,7 @@ class EpwingBook(object):
         '''
         self.book_path = book_path #TODO verify path is valid
         self.subbook = subbook
+        self._subbook = None
         self.gaiji_handler = gaiji_handler(self) if gaiji_handler else GaijiHandler(self)
 
         self.manager = manager
@@ -164,7 +165,7 @@ class EpwingBook(object):
         }
 
         subbook = int(self.subbook) if self.subbook else 0
-        eb_set_subbook(self.book, subbook)
+        self._set_subbook(subbook)
 
         return dict((key, val[1],) for key, val in all_methods.items() if val[0](self.book))
 
@@ -175,6 +176,12 @@ class EpwingBook(object):
         return self._search_methods.keys()
 
     #TODO separate URI from ID - have both!?
+
+    def _set_subbook(self, subbook):
+        subbook = int(subbook)
+        if self._subbook != subbook:
+            eb_set_subbook(self.book, subbook)
+            self._subbook = subbook
 
     @property
     def subbooks(self):
@@ -197,7 +204,7 @@ class EpwingBook(object):
 
     #TODO test this
     def audio(self, audio_id, subbook_id):
-        eb_set_subbook(self.book, int(subbook_id))
+        self._set_subbook(subbook_id)
         page, offset, data_size = map(_num_decode, audio_id.split(_ENTRY_ID_SPLIT))
         end_page = page + (data_size / EB_SIZE_PAGE)
         end_offset = offset + (data_size % EB_SIZE_PAGE)
@@ -231,7 +238,7 @@ class EpwingBook(object):
         else:
             subbook = int(self.subbook)
 
-        eb_set_subbook(self.book, subbook)
+        self._set_subbook(subbook)
         encoded_query = query.encode('euc-jp')
         if not encoded_query.strip():
             return
@@ -257,7 +264,7 @@ class EpwingBook(object):
 
     #TODO separate the heading method
     def _get_content(self, subbook, position, container, content_method):
-        eb_set_subbook(self.book, int(subbook))
+        self._set_subbook(subbook)
 
         # setup container
         container = Container()#debug_mode=True)

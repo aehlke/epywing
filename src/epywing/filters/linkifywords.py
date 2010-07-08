@@ -19,13 +19,19 @@ book_manager = None
 
 
 class LinkifyWordsFilter(BookFilter):
+    '''This filter turns words in an entry's text into clickable links for searching.
+    '''
     #link_template = u'[a href="{url}"]{text}[/a]'
-    link_template = u'<a href="{url}">{text}</a>'
+    #link_template = u'<a href="url">{text}</a>'
+    link_template = u'<span class="searchable-word" onclick="search(this);">{text}</span>'
 
     # punctuation characters regex for unicode
-    _po = ''.join(unichr(x) for x in xrange(65536) if unicodedata.category(unichr(x)) == 'Po')
-    _po = _po.replace('\\','\\\\').replace(']','\\]') # escape \ and ]
-    punctuation_regex = re.compile('[' + _po + ']')
+    _po_numbers = u'1234567890１２３４５６７８９０'
+    _po_extra = u'〈〉（）()←↓↑→⇒⇔＜＞【】《》[]［］〔〕「」『』◇◆★‖｜＝━−‘-〜…=×+＋○°θ▽'
+    _po_punc = u''.join(unichr(x) for x in xrange(65536) if unicodedata.category(unichr(x)) == 'Po')
+    _po = u''.join([_po_numbers, _po_extra, _po_punc])
+    _po = _po.replace(u'\\',u'\\\\').replace(u']', u'\\]') # escape \ and ]
+    punctuation_regex = re.compile(u'[' + _po + u']')
 
     def filter_text(self, text):
         '''`books` is a list of all books to search in when linkifying the entry's text.
@@ -42,11 +48,14 @@ class LinkifyWordsFilter(BookFilter):
         fragments = root.xpath('//text()')
 
         for fragment in fragments:#self._text_fragments(root):
-            parent = fragment.getparent()
-            linkified = self.linkify(cgi.escape(fragment))
-            
             # replace the fragment in the etree with the linkified text
             parent = fragment.getparent()
+
+            # don't linkify if it's inside an anchor link tag
+            if parent.tag == 'a':
+                continue
+
+            linkified = self.linkify(cgi.escape(fragment))
 
             try:
                 linkified = etree.XML(u''.join([u'<span>', linkified, u'</span>'])) ##u'<span>' + linkified + u'</span>')#.getroot()#, parser)
@@ -126,7 +135,7 @@ class LinkifyWordsFilter(BookFilter):
             from_ = position[0] + offset
             to = position[1] + offset
             word = text[from_:to]
-            replacement = self.link_template.format(url='?', text=word)
+            replacement = self.link_template.format(text=word)
             text = u''.join([text[:from_], replacement, text[to:]])
             offset += len(replacement) - len(word)
 

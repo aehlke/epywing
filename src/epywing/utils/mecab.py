@@ -31,14 +31,13 @@ class Wakati(object):
         '''Splits the text using mecab's wakati.
         '''
         if u'\n' in text:
-            return None
+            return [text]
         try:
             self._ensure_open()
         except Exception, e:
-            print e
-            return None
+            return [text]
 
-        text = unicode(text) + u'\n' # needs to end in a newline
+        text = ''.join([unicode(text), u'\n']) # needs to end in a newline
         self._mecab.stdin.write(text.encode('utf8'))
         self._mecab.stdin.flush()
         return unicode(self._mecab.stdout.readline().decode('utf8')).split()
