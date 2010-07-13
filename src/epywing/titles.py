@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-#
+
 from utils.plugin import PluginMount
 from epywing.categories import JapaneseEnglish, EnglishJapanese, Japanese
 

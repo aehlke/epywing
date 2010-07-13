@@ -79,10 +79,10 @@ class Entry(object):
 
     @property
     def id(self):
-        if self.heading_location:
-            return _position_to_resource_id(list(self.heading_location) + list(self.text_location))
+        if self._heading_location:
+            return _position_to_resource_id(list(self._heading_location) + list(self._text_location))
         else:
-            return _position_to_resource_id(list(self.text_location))
+            return _position_to_resource_id(list(self._text_location))
 
     @property
     def uri(self):
@@ -336,6 +336,8 @@ class EpwingBook(object):
         for reference in doc.cssselect('a[href]'):
             if reference.attrib['href'] in anchor_names:
                 reference.attrib['href'] = '#' + reference.attrib['href']
+            else:
+                reference.attrib['href'] = self.uri_dispatcher.uri_base + reference.attrib['href']
         return html.tostring(doc)
 
     def _fix_html_hacks(self, text):

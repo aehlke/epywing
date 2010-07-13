@@ -1,19 +1,43 @@
 import re
 
 # This module provides basic URI generation and routing for EPWING books.
-# It is not very sophisticated, but it could be used to handle just part of an HTTP URL -- 
+# It is not very sophisticated, but it could be used to handle just part of an HTTP URL namespace -- 
 # if for example your dictionary was at http://foo.com/dict/, then use your web framework 
 # to handle URLs below that, and let any URLs beginning with that be handled by this module.
 
+sub_uri_delimiter = '&'
+
+# Used for displaying several entries together.
+collection_uri_prefix = 'collection/'
 
 def route(uri, books):
-    '''Routes a URI to a resource (probably an Entry) within the given list of `books`, which are EpwingBook instances.
+    '''Routes a URI to a list of resources (typically an EpwingBook Entry) within the given list of `books`, which are EpwingBook instances,
+    or a single resource if appropriate.
+    A URI may contain "&" characters, which delimits multiple resource URIs.
     '''
-    for book in books:
-        dispatcher = book.uri_dispatcher
-        if dispatcher.matches(uri):
-            resource = dispatcher.route(uri)
-            return resource
+    # chop off protocol, if included
+    if '://' in uri:
+        uri = uri.split('://')[1]
+
+    is_collection = uri[:len(collection_uri_prefix)] == collection_uri_prefix
+
+    if is_collection:
+        # chop off the "collection/" part
+        uri = uri[len(collection_uri_prefix):]
+
+    resources = []
+
+    for sub_uri in uri.split(sub_uri_delimiter):
+        for book in books:
+            dispatcher = book.uri_dispatcher
+
+            if dispatcher.matches(sub_uri):
+                resource = dispatcher.route(sub_uri)
+                if is_collection:
+                    resources.append(resource)
+                else:
+                    return resource
+    return resources
 
 
 
@@ -57,7 +81,7 @@ class EpwingUriDispatcher(UriDispatcherBase):
         }
     }
 
-    def __init__(self, book, uri_base='/'):
+    def __init__(self, book, uri_base='epwing://'):
         ''' `book` is an EpwingBook that this object dispatches URIs for
         '''
         self.book = book
@@ -71,9 +95,10 @@ class EpwingUriDispatcher(UriDispatcherBase):
     def matches(self, uri):
         '''Returns whether the given URI is handled by this book.
         '''
-        #print 'component:',
-        #print components
-        subbook_ids = [subbook['id'] for subbook in self.book.subbooks]
+        if self.book.subbook:
+            subbook_ids = [str(self.book.subbook)]
+        else:
+            subbook_ids = [subbook['id'] for subbook in self.book.subbooks]
         match = self.parse(uri)
         components = match['components']
         #return False

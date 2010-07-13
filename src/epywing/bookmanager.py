@@ -9,6 +9,7 @@ from collections import defaultdict
 # these files will identify a directory as an EPWING book
 EPWING_IDENTIFYING_FILENAMES = ['CATALOGS', 'catalogs', 'CATALOG', 'catalog',]
 
+
 class BookManager(object):
     '''Manage a set of epwing dictionaries, to do things like searching all available books.
     `self.books` is a dictionary that maps book ID to EpwingBook instance.
