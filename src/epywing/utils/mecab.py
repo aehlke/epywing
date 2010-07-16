@@ -5,7 +5,7 @@ import subprocess
 #from epywing.util import strip_tags
 
 class Wakati(object):
-    '''Wrapper class for mecab -O wakati, which is used to split Japanese words.
+    '''Wrapper class for `mecab -O wakati`, which is used to split Japanese words.
     '''
     def __init__(self):
         self._mecab = None
@@ -34,13 +34,13 @@ class Wakati(object):
             return [text]
         try:
             self._ensure_open()
+
+            text = ''.join([unicode(text), u'\n']) # needs to end in a newline
+            self._mecab.stdin.write(text.encode('utf8'))
+            self._mecab.stdin.flush()
+            return unicode(self._mecab.stdout.readline().decode('utf8')).split()
         except Exception, e:
             return [text]
-
-        text = ''.join([unicode(text), u'\n']) # needs to end in a newline
-        self._mecab.stdin.write(text.encode('utf8'))
-        self._mecab.stdin.flush()
-        return unicode(self._mecab.stdout.readline().decode('utf8')).split()
             
 
 # tests

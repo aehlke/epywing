@@ -77,6 +77,17 @@ class Entry(object):
             self._text = self.parent._get_content(self.subbook, self._text_location, None, eb_read_text)
         return self._text
 
+    @BookFilter.wrap_filter('filter_text', is_iterator=True)
+    def text_iterator(self):
+        if not self._text:
+            text = u''
+            for chunk in self.parent._get_content_iterator(self.subbook, self._text_location, None, eb_read_text):
+                text = u''.join([text, chunk])
+                yield chunk
+            self._text = text
+        else:
+            yield self._text
+
     @property
     def id(self):
         if self._heading_location:
@@ -89,10 +100,12 @@ class Entry(object):
         return self.parent.uri_dispatcher.uri('entry', subbook=self.subbook, entry=self.id)
          
 
-
 class Container(object):
+    '''To share state in parser callbacks.
+    '''
 
-    # this is used for an unfortunate hack
+    # This is used for an unfortunate yet necessary hack,
+    # for determining where entries end.
     EARLY_ENTRY_TERMINATOR = '__MANABI_EARLY_ENTRY_TERMINATOR__'
 
     def __init__(self, debug_mode=False):
@@ -198,10 +211,6 @@ class EpwingBook(object):
             })
         return ret
 
-    #TODO
-    #def entries(self, from_entry_id, subbook_id, container=None):
-    #  pass #yield entries one by one
-
     #TODO test this
     def audio(self, audio_id, subbook_id):
         self._set_subbook(subbook_id)
@@ -226,7 +235,6 @@ class EpwingBook(object):
         Only set `subbook` if `self.subbook` is None (though it is not necessary - all subbooks will be 
         searched if both are None).
         '''
-        #TODO what's container?
         if not query:
             return
         if not self.subbook and not subbook:
@@ -262,8 +270,25 @@ class EpwingBook(object):
                     entry = Entry(self, subbook, heading_location, text_location)
                     yield entry
 
-    #TODO separate the heading method
-    def _get_content(self, subbook, position, container, content_method):
+    def _get_content(self, *args, **kwargs):
+        return u''.join([e for e in self._get_content_iterator(*args, **kwargs)])
+
+    def _get_content_iterator(self, subbook, position, container, content_method):
+        def clean_data(data):
+            data = unicode(data, 'euc-jp', errors='ignore')
+
+            # handle HTML escaping, since we add HTML tags, but entries may contain < and > characters
+            data = data.replace('<', '&lt;')
+            data = data.replace('>', '&gt;')
+            data = self._unescape_html(data)
+
+            data = self.gaiji_handler.replace_all_gaiji_tags(data)
+
+            if content_method != eb_read_heading:
+                data = self._fix_html_hacks(data)
+                data = self._fix_anchor_links(data)
+            return data
+
         self._set_subbook(subbook)
 
         # setup container
@@ -276,26 +301,24 @@ class EpwingBook(object):
         eb_seek_text(self.book, position)
 
         for i in xrange(400):
-            buffer = []
+            buffer_ = []
             while True:
                 data_chunk = content_method(self.book, self.appendix, self.hookset, container)
                 if not data_chunk:
                     break
-                buffer.append(data_chunk)
+                buffer_.append(data_chunk)
             container.read_count += 1
 
             if container.read_count == 1 and container.indent_stop_code_count >= 1:
                 container.indent_stop_code_in_first_read = True
 
-            data += ''.join(buffer)
+            data += ''.join(buffer_)
             if container.debug_mode:
                 data += '[--eor--]'
 
-
             i = data.find(container.EARLY_ENTRY_TERMINATOR)
             if i != -1:
-                if not container.debug_mode:
-                    data = data[:i]
+                data = data[:i]
                 break
 
             if content_method == eb_read_heading:
@@ -307,25 +330,11 @@ class EpwingBook(object):
             except EBError, (error, message):
                 break
 
-        data = unicode(data, 'euc-jp', errors='ignore')
+            yield clean_data(data)
+            data = ''
 
-        # handle HTML escaping, since we add HTML tags, but entries may contain < and > characters
-        data = data.replace('<', '&lt;')
-        data = data.replace('>', '&gt;')
-        data = self._unescape_html(data)
-
-        data = self.gaiji_handler.replace_all_gaiji_tags(data)
-
-        #TODO refactor
-        #data = string.replace(data, u'\x00', '') #remove null characters, which can break lxml's HTML parser
-        #data = string.replace(data, u'→§', u'§') #''
-        #data = string.replace(data, u'＝→', u'＝')
-        #data = string.replace(data, u'⇒→', u'⇒')
-        #data = string.replace(data, u'⇔→', u'⇔')
-        if content_method != eb_read_heading:
-            data = self._fix_html_hacks(data)
-            data = self._fix_anchor_links(data)
-        return data
+        if data:
+            yield clean_data(data)
     
     def _fix_anchor_links(self, text):
         '''If a reference links to a position within the entries already loaded,
@@ -516,7 +525,7 @@ class EpwingBook(object):
                   EB_HOOK_END_DECORATION:     end_decoration,
         }
 
-        text = hooks.get(code, '!')#[code]
+        text = hooks.get(code, '?')
         if callable(text):
             text = text()
         if text is not None:

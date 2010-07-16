@@ -3,6 +3,7 @@ from utils.plugin import PluginMount
 from glob import glob
 import os
 import imp
+from functools import partial
 
 class BookFilter(object):
     '''
@@ -68,26 +69,35 @@ class BookFilter(object):
 
 
     @classmethod
-    def wrap_filter(cls, filter_name):
+    def wrap_filter(cls, filter_name, is_iterator=False):
         '''Decorator for filtering a method's return value.
         Passes on kwargs to filter function.
         '''
         def factory(func):
-            @wraps(func)
-            def decorator(self, *args, **kwargs):
-                ret = func(self, *args, **kwargs)
-
-                book = self.parent
-                title = book.title
-
+            def execute_filter(value, book, title, *args, **kwargs):
                 # Execute any filter that applies to
                 # this book's title (if specified).
                 for plugin_cls in cls.get_filters_for_title(title):
                     if hasattr(plugin_cls, filter_name):
                         plugin = plugin_cls(book)
-                        ret = getattr(plugin, filter_name)(ret, **kwargs)
-                return ret
-            return decorator
+                        value = getattr(plugin, filter_name)(value, **kwargs)
+                return value
+
+            book = self.parent
+            title = book.title
+
+            if is_iterator:
+                @wraps(func)
+                def decorator(self, *args, **kwargs):
+                    for ret in func(self, *args, **kwargs):
+                        yield execute_filter(ret, book, title, *args, **kwargs)
+                return decorator
+            else:
+                @wraps(func)
+                def decorator(self, *args, **kwargs):
+                    ret = func(self, *args, **kwargs)
+                    return execute_filter(ret, book, title, *args, **kwargs)
+                return decorator
         return factory
 
 
