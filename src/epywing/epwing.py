@@ -4,104 +4,26 @@ from eb import *
 import sys
 from os import path
 import string
-from itertools import izip, cycle
 from lxml import html
 from lxml.cssselect import CSSSelector
-import re
 
 from mybase64 import urlsafe_b64_encode, urlsafe_b64_decode, _num_decode, _position_to_resource_id, _ENTRY_ID_SPLIT
-
 from uris import EpwingUriDispatcher
 from gaiji import GaijiHandler
 import util
 import struct
-from bookfilter import BookFilter
 from titles import BookTitle
+from epwingentry import Entry
 
 #TODO refactor hooks - DRY
 
 #EB API reference http://www.sra.co.jp/people/m-kasahr/eb/doc/eb-09.html
 
 
-class Entry(object):
-    '''Represents an entry in an EPWING dictionary.
-    '''
-
-    def __init__(self, parent, subbook, heading_location, text_location):
-        '''`parent` is an EpwingBook instance.
-        #`entry_locations` is a 2- or 4-tuple containing the entry's heading and text offsets.
-        '''
-        self.parent = parent
-        self.subbook = int(subbook)
-
-        self._heading = None
-        self._text = None
-        self._heading_location = heading_location
-        self._text_location = text_location
-
-    @classmethod
-    def from_encoded_location(cls, parent, subbook_id, encoded_location):
-        '''Returns an Entry instance given an encoded location, like from a URI.
-        `location` might contain both a heading and text location, or just the text location,
-        depending on the origin of the link (whether from search results, or a reference within a text).
-        '''
-        locations = map(_num_decode, encoded_location.split(_ENTRY_ID_SPLIT))
-        location = (locations[0], locations[1],)
-        if len(locations) == 4:
-            heading_location = location
-            text_location = (locations[2], locations[3],)
-        elif len(locations) == 2:
-            heading_location = None
-            text_location = location
-        else:
-            raise ValueError
-        return cls(parent, subbook_id, heading_location, text_location)
-
-    @property
-    @BookFilter.wrap_filter('filter_heading')
-    def heading(self):
-        '''Sometimes we follow a reference link to an entry that doesn't include its heading,
-        just the text location, so an Entry instance doesn't always have a heading property.
-        '''
-        if self._heading_location:
-            if not self._heading:
-                self._heading = self.parent._get_content(self.subbook, self._heading_location, None, eb_read_heading)
-            return self._heading
-        else:
-            return None
-
-    @property
-    @BookFilter.wrap_filter('filter_text')
-    def text(self):
-        if not self._text:
-            self._text = self.parent._get_content(self.subbook, self._text_location, None, eb_read_text)
-        return self._text
-
-    @BookFilter.wrap_filter('filter_text', is_iterator=True)
-    def text_iterator(self):
-        if not self._text:
-            text = u''
-            for chunk in self.parent._get_content_iterator(self.subbook, self._text_location, None, eb_read_text):
-                text = u''.join([text, chunk])
-                yield chunk
-            self._text = text
-        else:
-            yield self._text
-
-    @property
-    def id(self):
-        if self._heading_location:
-            return _position_to_resource_id(list(self._heading_location) + list(self._text_location))
-        else:
-            return _position_to_resource_id(list(self._text_location))
-
-    @property
-    def uri(self):
-        return self.parent.uri_dispatcher.uri('entry', subbook=self.subbook, entry=self.id)
          
 
 class Container(object):
-    '''To share state in parser callbacks.
+    '''To share state in Epwing parser callbacks.
     '''
 
     # This is used for an unfortunate yet necessary hack,

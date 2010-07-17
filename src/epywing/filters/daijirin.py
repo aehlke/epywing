@@ -6,7 +6,7 @@ from epywing.titles import SanseidoSuperDaijirin
 class Daijirin(BookFilter):
     applies_to = [SanseidoSuperDaijirin]
 
-    def filter_heading(self, heading):
+    def filter_heading(self, entry, heading):
         if heading is not None:
             replacements = {
             }
@@ -15,7 +15,7 @@ class Daijirin(BookFilter):
                 heading = heading.replace(find, replace)
         return heading
 
-    def filter_text(self, text):
+    def filter_text(self, entry, text):
         return text
 
     narrow_gaiji = {

@@ -8,7 +8,7 @@ from epywing.titles import KenkyushaReadersPlus
 class KenkyushaReadersPlusFilter(BookFilter):
     applies_to = [KenkyushaReadersPlus]
 
-    def filter_heading(self, heading):
+    def filter_heading(self, entry, heading):
         if heading is not None:
             replacements = {
             }
@@ -17,9 +17,6 @@ class KenkyushaReadersPlusFilter(BookFilter):
                 heading = heading.replace(find, replace)
 
         return heading.strip()
-
-    def filter_text(self, text):
-        return text
 
     narrow_gaiji = {}
 

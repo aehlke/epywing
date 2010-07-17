@@ -2,11 +2,11 @@
 from itertools import islice
 from epywing.bookfilter import BookFilter
 from epywing.utils.mecab import Wakati
+from epywing.utils.punctuation import punctuation_and_numbers_regex
 from lxml import etree, html
 from StringIO import StringIO
 import string
 import re
-import unicodedata
 import lxml.html
 import cgi
 
@@ -25,15 +25,7 @@ class LinkifyWordsFilter(BookFilter):
     #link_template = u'<a href="url">{text}</a>'
     link_template = u'<span class="searchable-word" onclick="search(this);">{text}</span>'
 
-    # punctuation (and other non-word characters) regex for unicode
-    _po_numbers = u'1234567890１２３４５６７８９０'
-    _po_extra = u'〈〉（）()←↓↑→⇒⇔＜＞【】《》[]［］〔〕「」『』◇◆★‖｜＝━−‘-〜…=×+＋○°θ▽'
-    _po_punc = u''.join(unichr(x) for x in xrange(65536) if unicodedata.category(unichr(x)) == 'Po')
-    _po = u''.join([_po_numbers, _po_extra, _po_punc])
-    _po = _po.replace(u'\\',u'\\\\').replace(u']', u'\\]') # escape \ and ]
-    punctuation_regex = re.compile(u'[' + _po + u']')
-
-    def filter_text(self, text):
+    def filter_text(self, entry, text):
         '''`books` is a list of all books to search in when linkifying the entry's text.
         '''
         if hasattr(self.book, 'manager'):
@@ -93,7 +85,7 @@ class LinkifyWordsFilter(BookFilter):
         if text in _memo:
             return _memo[text]
         else:
-            _memo[text] = not bool(self.punctuation_regex.sub(u'', text).strip())
+            _memo[text] = not bool(punctuation_and_numbers_regex.sub(u'', text).strip())
             return _memo[text]
 
     def linkify(self, text):

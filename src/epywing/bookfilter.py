@@ -4,6 +4,7 @@ from glob import glob
 import os
 import imp
 from functools import partial
+from inspect import isgeneratorfunction
 
 class BookFilter(object):
     '''
@@ -17,20 +18,21 @@ class BookFilter(object):
     def __init__(self, book, *args, **kwargs):
         self.book = book
 
-    def filter_heading(self, heading):
-        '''
-        Wraps `Entry.heading`
+    def filter_heading(self, entry, heading):
+        '''Wraps `Entry.heading`
         '''
         #raise NotImplementedError('Subclasses must override this!')
         return heading
 
-    def filter_text(self, text):
+    def filter_text(self, entry, text):
+        '''Wraps `Entry.text`
         '''
-        Wraps `Entry.text`
-        '''
-        #raise NotImplementedError('Subclasses must override this!')
         return text
 
+    def filter_normalized_heading(self, entry, normalized_heading):
+        '''Wraps `Entry.normalized_heading`
+        '''
+        return normalized_heading
 
     @classmethod
     def get_filters_for_title(cls, title):
@@ -69,34 +71,38 @@ class BookFilter(object):
 
 
     @classmethod
-    def wrap_filter(cls, filter_name, is_iterator=False):
+    def wrap_filter(cls, filter_name):
         '''Decorator for filtering a method's return value.
-        Passes on kwargs to filter function.
+        Works on generator functions too.
+        Passes kwargs on to filter function.
         '''
         def factory(func):
-            def execute_filter(value, book, title, *args, **kwargs):
+            def execute_filter(entry, value, book, title, *args, **kwargs):
                 # Execute any filter that applies to
                 # this book's title (if specified).
                 for plugin_cls in cls.get_filters_for_title(title):
                     if hasattr(plugin_cls, filter_name):
                         plugin = plugin_cls(book)
-                        value = getattr(plugin, filter_name)(value, **kwargs)
+                        value = getattr(plugin, filter_name)(entry, value, **kwargs)
                 return value
 
-            book = self.parent
-            title = book.title
-
-            if is_iterator:
+            if isgeneratorfunction(func):
                 @wraps(func)
                 def decorator(self, *args, **kwargs):
+                    book = self.parent
+                    title = book.title
+
                     for ret in func(self, *args, **kwargs):
-                        yield execute_filter(ret, book, title, *args, **kwargs)
+                        yield execute_filter(self, ret, book, title, *args, **kwargs)
                 return decorator
             else:
                 @wraps(func)
                 def decorator(self, *args, **kwargs):
+                    book = self.parent
+                    title = book.title
+
                     ret = func(self, *args, **kwargs)
-                    return execute_filter(ret, book, title, *args, **kwargs)
+                    return execute_filter(self, ret, book, title, *args, **kwargs)
                 return decorator
         return factory
 

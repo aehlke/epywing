@@ -1,4 +1,5 @@
 import re
+from epwingentry import Entry
 
 # This module provides basic URI generation and routing for EPWING books.
 # It is not very sophisticated, but it could be used to handle just part of an HTTP URL namespace -- 

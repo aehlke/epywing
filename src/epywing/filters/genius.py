@@ -1,7 +1,13 @@
 # -*- coding: utf-8 -*-
 
+import re
+import unicodedata
 from epywing.bookfilter import BookFilter
 from epywing.titles import GeniusEiwaDaijiten, GeniusEiwaWaeiJiten
+
+def remove_accents(text):
+    nfkd_form = unicodedata.normalize('NFKD', unicode(text))
+    return u''.join([c for c in nfkd_form if not unicodedata.combining(c)])
 
 
 class GeniusFilter(BookFilter):
@@ -9,11 +15,44 @@ class GeniusFilter(BookFilter):
     '''
     applies_to = [GeniusEiwaDaijiten, GeniusEiwaWaeiJiten]
 
+    # for example: 【test 1】~ driver
+    subentry_regex = re.compile(u'【(?P<parent>.+)】.?〜 (?P<postfix>.+)', re.UNICODE)
+
+    # for example, test<sup>1</sup>
+    homonym_regex = re.compile(r'(?P<heading>.+)<sup>(?P<index>.+)</sup>', re.UNICODE)
+
+    def filter_heading(self, entry, heading):
+        heading = remove_accents(heading)
+        return heading
+
+    def filter_normalized_heading(self, entry, normalized_heading):
+        heading = entry.heading
+
+        # Subentries
+        m = self.subentry_regex.match(heading)
+        if m:
+            #print 'subentries'
+            parent, postfix = m.group('parent'), m.group('postfix')
+            #return entry.normalized_subentry_heading_format.format(parent=parent, postfix=postfix)
+            #print parent,
+            #print postfix
+            return u'{parent} {postfix}'.format(parent=parent, postfix=postfix)
+
+        # Homonyms
+        m = self.homonym_regex.match(heading)
+        if m:
+            heading, index = m.group('heading'), m.group('index')
+            print heading
+            entry._homonym_index = int(index)
+            return u'{0}'.format(heading)#, index)
+
+        return normalized_heading
+
 
 class GeniusEiwaDaijitenFilter(BookFilter):
     applies_to = [GeniusEiwaDaijiten]
 
-    def filter_heading(self, heading):
+    def filter_heading(self, entry, heading):
         if heading is not None:
             replacements = {
                 #u'·': u'',
@@ -24,7 +63,7 @@ class GeniusEiwaDaijitenFilter(BookFilter):
                 heading = heading.replace(find, replace)
         return heading
 
-    def filter_text(self, text):
+    def filter_text(self, entry, text):
         return text
 
     narrow_gaiji = {
@@ -336,8 +375,8 @@ class GeniusEiwaDaijitenFilter(BookFilter):
         41524: None,
         41525: None,
 
-        42040: (None, u'〜'),
-        42041: (None, u'〜'),
+        42040: (u'〜', u'〜'),
+        42041: (u'〜', u'〜'),
         42042: u'━',
 
         42048: u'©',
@@ -407,7 +446,8 @@ class GeniusEiwaDaijitenFilter(BookFilter):
 class GeniusEiwaWaeiJitenFilter(BookFilter):
     applies_to = [GeniusEiwaWaeiJiten]
 
-    def filter_heading(self, heading):
+    @classmethod
+    def filter_heading(cls, entry, heading):
         if heading is not None:
             replacements = {
                 u'·': u'',
