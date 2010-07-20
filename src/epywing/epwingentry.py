@@ -6,6 +6,7 @@ from bookfilter import BookFilter
 from utils.punctuation import punctuation_regex
 from epywing.util import strip_tags, ComparableMixin
 import re
+from threading import RLock
 
 class Entry(object, ComparableMixin):
     '''Represents an entry in an EPWING dictionary.
@@ -22,6 +23,9 @@ class Entry(object, ComparableMixin):
     ## subentry heading example: 【test 1】~ driver
     ##normalized_subentry_heading_format = u'【{parent}<sup>{index}</sup>】{postfix}'
     #normalized_subentry_heading_format = u'{parent} {postfix}'
+
+    # lock used for calls to EBlibrary via `EpwingBook` class
+    eb_lock = RLock()
 
     def __init__(self, parent, subbook, heading_location, text_location):
         '''`parent` is an EpwingBook instance.
@@ -75,7 +79,7 @@ class Entry(object, ComparableMixin):
             h1, h2 = self._symbols_regex.sub(u'', self.heading.lower()), self._symbols_regex.sub(u'', other.heading.lower())
 
             if h1 == h2:
-                print self.heading
+                #print self.heading
                 return self.heading < other.heading
             else:
                 return h1 < h2
@@ -90,7 +94,8 @@ class Entry(object, ComparableMixin):
         '''
         if self._heading_location:
             if not self._heading:
-                self._heading = self.parent._get_content(self.subbook, self._heading_location, None, eb_read_heading)
+                with self.eb_lock:
+                    self._heading = self.parent._get_content(self.subbook, self._heading_location, None, eb_read_heading)
             return self._heading
         else:
             return None
@@ -110,15 +115,24 @@ class Entry(object, ComparableMixin):
             self._normalized_heading = heading
         return self._normalized_heading
 
+    def guess_heading_from_text(self):
+        lines = strip_tags(self.text.replace('<br>', '\n')).split()
+        heading = lines[0] if lines else u''
+        return heading
+
     @property
     @BookFilter.wrap_filter('filter_text')
     def text(self):
         if not self._text:
-            self._text = self.parent._get_content(self.subbook, self._text_location, None, eb_read_text)
+            #print 'text'
+            with self.eb_lock:
+                self._text = self.parent._get_content(self.subbook, self._text_location, None, eb_read_text)
         return self._text
 
     @BookFilter.wrap_filter('filter_text')
     def text_iterator(self):
+        '''When calling this, to achieve thread safety, call it within a `with Entry.eb_lock:` block.
+        '''
         if not self._text:
             text = u''
             for chunk in self.parent._get_content_iterator(self.subbook, self._text_location, None, eb_read_text):

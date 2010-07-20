@@ -211,30 +211,35 @@ class EpwingBook(object):
                 data = self._fix_anchor_links(data)
             return data
 
-        self._set_subbook(subbook)
-
-        # setup container
         container = Container()#debug_mode=True)
+        self._set_subbook(subbook)
         self._set_hooks(content_method)
-
         self._buffer_entry_count = 0
         self._buffer_start_position = position
         data = ''
         eb_seek_text(self.book, position)
 
-        for i in xrange(400):
+        for i in xrange(400): # this value just has to be sufficiently large to cover the longest entries
             buffer_ = []
+
             while True:
-                data_chunk = content_method(self.book, self.appendix, self.hookset, container)
+                try:
+                    data_chunk = content_method(self.book, self.appendix, self.hookset, container)
+                except EBError, e:
+                    break
+
                 if not data_chunk:
                     break
+
                 buffer_.append(data_chunk)
+
             container.read_count += 1
 
             if container.read_count == 1 and container.indent_stop_code_count >= 1:
                 container.indent_stop_code_in_first_read = True
 
             data += ''.join(buffer_)
+
             if container.debug_mode:
                 data += '[--eor--]'
 
@@ -248,7 +253,7 @@ class EpwingBook(object):
 
             #FIXME sometimes goes too far now
             try:
-                eb_forward_text(self.book, self.appendix)
+                pos = eb_forward_text(self.book, self.appendix)
             except EBError, (error, message):
                 break
 

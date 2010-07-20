@@ -20,6 +20,10 @@ def route(uri, books):
     if '://' in uri:
         uri = uri.split('://')[1]
 
+    # chop off hash, if included
+    if '#' in uri:
+        uri = uri.split('#')[0]
+
     is_collection = uri[:len(collection_uri_prefix)] == collection_uri_prefix
 
     if is_collection:
@@ -101,10 +105,13 @@ class EpwingUriDispatcher(UriDispatcherBase):
         else:
             subbook_ids = [subbook['id'] for subbook in self.book.subbooks]
         match = self.parse(uri)
-        components = match['components']
-        #return False
-        return components['book'] == self.book.id \
-                and components['subbook'] in subbook_ids
+        if match:
+            components = match['components']
+            #return False
+            return components['book'] == self.book.id \
+                    and components['subbook'] in subbook_ids
+        else:
+            return False
 
 
 

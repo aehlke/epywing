@@ -26,18 +26,17 @@ class HistoryManager(object):
 
     @property
     def current_location(self):
+        if not self._back:
+            return None
+
         return self._back[-1]
 
     @current_location.setter
     def current_location(self, value):
-        print 'current_location:',
-        if value:
-            print value['entry'].heading
-        else:
-            print ''
         '''Setting this doesn't push a new history item
         (unless there is none, then it pushes it but you can still overwrite 
         it by setting again).'''
+        #print 'current_location:',
         if self._back:
             self._back.pop()
         #self.push(value)
@@ -48,11 +47,11 @@ class HistoryManager(object):
         If `uri` is None, then it will push the current location back, and set the 
         new current location to None.
         '''
-        print 'push:',
-        if uri:
-            print uri['entry'].heading
-        else:
-            print ''
+        #print 'push:',
+        #if uri:
+            #print uri['entry'].heading
+        #else:
+            #print ''
         if uri:
             self._back.append(uri)
         else:

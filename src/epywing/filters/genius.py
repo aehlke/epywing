@@ -42,7 +42,6 @@ class GeniusFilter(BookFilter):
         m = self.homonym_regex.match(heading)
         if m:
             heading, index = m.group('heading'), m.group('index')
-            print heading
             entry._homonym_index = int(index)
             return u'{0}'.format(heading)#, index)
 

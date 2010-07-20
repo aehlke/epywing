@@ -40,7 +40,7 @@ class BookManager(object):
             try:
                 book = EpwingBook(book_path)
             except Exception as e:
-                print e
+                #print e
                 # some kind of binding error, so don't import this book - just ignore it, and don't include it in the return value
                 #TODO have a better custom exception or something for this so we don't catch all Exceptions
                 continue

@@ -75,15 +75,17 @@ class BookFilter(object):
         '''Decorator for filtering a method's return value.
         Works on generator functions too.
         Passes kwargs on to filter function.
+        Does not execute the filter if the value being filtered is None.
         '''
         def factory(func):
             def execute_filter(entry, value, book, title, *args, **kwargs):
                 # Execute any filter that applies to
                 # this book's title (if specified).
-                for plugin_cls in cls.get_filters_for_title(title):
-                    if hasattr(plugin_cls, filter_name):
-                        plugin = plugin_cls(book)
-                        value = getattr(plugin, filter_name)(entry, value, **kwargs)
+                if value is not None:
+                    for plugin_cls in cls.get_filters_for_title(title):
+                        if hasattr(plugin_cls, filter_name):
+                            plugin = plugin_cls(book)
+                            value = getattr(plugin, filter_name)(entry, value, **kwargs)
                 return value
 
             if isgeneratorfunction(func):
