@@ -124,7 +124,6 @@ class Entry(object, ComparableMixin):
     @BookFilter.wrap_filter('filter_text')
     def text(self):
         if not self._text:
-            #print 'text'
             with self.eb_lock:
                 self._text = self.parent._get_content(self.subbook, self._text_location, None, eb_read_text)
         return self._text

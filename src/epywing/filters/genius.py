@@ -5,6 +5,8 @@ import unicodedata
 from epywing.bookfilter import BookFilter
 from epywing.titles import GeniusEiwaDaijiten, GeniusEiwaWaeiJiten
 
+
+
 def remove_accents(text):
     nfkd_form = unicodedata.normalize('NFKD', unicode(text))
     return u''.join([c for c in nfkd_form if not unicodedata.combining(c)])

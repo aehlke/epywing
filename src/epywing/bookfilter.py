@@ -1,6 +1,7 @@
 from functools import wraps
 from utils.plugin import PluginMount
-from glob import glob
+#from glob import glob
+from pkg_resources import resource_listdir, resource_filename, resource_isdir, resource_string
 import os
 import imp
 from functools import partial
@@ -109,17 +110,26 @@ class BookFilter(object):
         return factory
 
 
-def load_filter_plugins(directory=os.path.join(os.path.dirname(__file__), 'filters')):
+def load_filter_plugins(directory='filters'):
     '''Imports all source files in `directory`, which should contain
     filter plugin subclasses of BookFilter.
     '''
-    files = set(glob(os.path.join(directory, '*.py')))
+    files = [f for f in resource_listdir(__name__, directory) if not resource_isdir(__name__, f) and f[-3:] == '.py']
 
     for file_ in files:
         # simply initializing the plugin is enough to add it to the
         # filter collection, thanks to BookFilter's PluginMount metaclass.
         module_name = os.path.splitext(os.path.basename(file_))[0]
-        plugin_module = imp.load_source(module_name, file_)
+        file_path = u'{0}/{1}'.format(directory, file_)
+        file_string = resource_string(__name__, file_path)
+
+        code = compile(file_string, module_name, 'exec')
+        namespace = {}
+        eval(code, namespace)
+        
+        #eval(compile(file_string, module_name, 'exec'), globals())
+        
+        #plugin_module = imp.load_source(module_name, resource_filename(__name__, file_))
 
         
 load_filter_plugins()
