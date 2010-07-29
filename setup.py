@@ -15,7 +15,7 @@ setup(name='epywing',
     #package_dir={'epywing': 'src/epywing'},
     install_requires=[
        'lxml>=2.2.4',
-       'ebmodule==2.2',
+       'ebmodule>=2.2',
     ]
 )
 
